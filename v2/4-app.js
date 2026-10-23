@@ -1,7 +1,7 @@
 (function () {
     'use strict';
     var stage = document.getElementById('stage');
-    var poster = document.getElementById('poster');
+    var taplayer = document.getElementById('taplayer');
     var video = document.getElementById('video');
     var bg = document.getElementById('bg');
     var scrim = document.getElementById('scrim');
@@ -34,8 +34,7 @@
 
     function setPhase(p) {
         phase = p;
-        poster.classList.toggle('is-hidden', p !== 'poster');
-        video.classList.toggle('is-live', p === 'playing' || p === 'fading');
+        taplayer.classList.toggle('is-hidden', p !== 'poster');
         if (p === 'playing') {
             clearTimeout(watchdog);
             // iOS: Start blieb nach Tap bei 0 stehen -> sauber zum Poster zurueck.
@@ -80,7 +79,7 @@
         phase = 'revealed';
         bg.classList.add('is-on');
         scrim.classList.add('is-on');
-        setTimeout(function () { video.classList.remove('is-live'); }, 500);
+        setTimeout(function () { video.classList.add('is-gone'); }, 500);
     }
 
     function replay() {
@@ -91,6 +90,7 @@
         video.pause();
         video.currentTime = 0;
         video.classList.remove('is-frost');
+        video.classList.remove('is-gone');
         card.classList.remove('is-in');
         cardWrap.setAttribute('aria-hidden', 'true');
         bg.classList.remove('is-on');
@@ -98,7 +98,7 @@
         setPhase('poster');
     }
 
-    poster.addEventListener('click', start);
+    taplayer.addEventListener('click', start);
     // Fallback: blockierte Autoplay-Pfade (z.B. iOS) -> Ton beim naechsten
     // echten Fingertipp starten, sobald die Karte sichtbar ist.
     stage.addEventListener('pointerdown', function () {
