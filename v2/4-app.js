@@ -26,8 +26,8 @@
     var watchdog = null;
     var seeking = false;
     var audioTimer = null;
-    var HINT_DEFAULT = 'Tippen zum Oeffnen';
-    var HINT_LOADING = 'Laedt ...';
+    var HINT_DEFAULT = 'Tippen zum Öffnen';
+    var HINT_LOADING = 'Lädt …';
     var HINT_RETRY = 'Nicht geladen - nochmal tippen';
 
     function fmt(t) {
