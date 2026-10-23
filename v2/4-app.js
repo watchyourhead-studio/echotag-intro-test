@@ -135,6 +135,11 @@
             audio.play().catch(function () {});
         }
     });
+    video.addEventListener('loadeddata', function () {
+        if (phase === 'poster' && video.currentTime === 0) {
+            try { video.currentTime = 0.04; } catch (e) {}
+        }
+    });
     video.addEventListener('playing', function () {
         if (phase === 'loading' || phase === 'retry') setPhase('playing');
     });
