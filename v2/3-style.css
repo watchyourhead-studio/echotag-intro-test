@@ -100,7 +100,7 @@ body {
 @keyframes itemIn { to { opacity: 1; transform: translateY(0); } }
 
 .card-eyebrow { font-size: 10px; letter-spacing: .28em; text-transform: uppercase; color: #a98a96; margin-bottom: 4px; }
-.card-title { font-family: Georgia, 'Times New Roman', serif; font-size: 21px; font-weight: 600; color: #33222a; margin-bottom: 14px; }
+.card-title { font-size: 21px; font-weight: 700; letter-spacing: .01em; color: #33222a; margin-bottom: 14px; }
 
 .player-label { font-size: 11px; color: #8a7a81; margin-bottom: 8px; }
 .player-row { display: flex; align-items: center; gap: 10px; }
