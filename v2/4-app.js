@@ -141,7 +141,7 @@
     video.addEventListener('timeupdate', function () {
         if (!video.duration) return;
         var rest = video.duration - video.currentTime;
-        if (rest <= 3.5) beginReveal();
+        if (rest <= 4.5) beginReveal();
     });
     video.addEventListener('ended', freezeFrame);
     video.addEventListener('error', freezeFrame);
