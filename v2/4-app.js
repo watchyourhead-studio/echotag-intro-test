@@ -93,6 +93,13 @@
     }
 
     poster.addEventListener('click', start);
+    // Fallback: blockierte Autoplay-Pfade (z.B. iOS) -> Ton beim naechsten
+    // echten Fingertipp starten, sobald die Karte sichtbar ist.
+    stage.addEventListener('pointerdown', function () {
+        if (card.classList.contains('is-in') && audio.paused && audio.currentTime === 0) {
+            audio.play().catch(function () {});
+        }
+    });
     video.addEventListener('timeupdate', function () {
         if (!video.duration) return;
         if (video.duration - video.currentTime <= 0.9) beginReveal();
