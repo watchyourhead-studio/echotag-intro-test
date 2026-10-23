@@ -57,25 +57,30 @@
         setPhase('playing');
     }
 
+    // Karte fliegt EIN, waehrend das Video dahinter weiterlaeuft.
+    // Frost-Blur zieht als Uebergang mit, Blumen bleiben sichtbar.
     function beginReveal() {
         if (phase !== 'playing') return;
-        phase = 'fading';
-        // Endbild einblenden (deckt sich mit dem eingefrorenen letzten Videoframe),
-        // dann Video ausblenden und Karte mit Eintritts-Animation holen.
+        phase = 'revealing';
+        video.classList.add('is-frost');
+        cardWrap.setAttribute('aria-hidden', 'false');
+        card.classList.add('is-in');
+        // Testton startet, wenn die Karte landet.
+        clearTimeout(audioTimer);
+        audioTimer = setTimeout(function () {
+            audio.currentTime = 0;
+            audio.play().catch(function () {});
+        }, 1500);
+    }
+
+    // Video ist am letzten Frame angekommen: exakt dieses Standbild
+    // (identisch zum Clip-Ende) als Hintergrund halten, Video weg.
+    function freezeFrame() {
+        if (phase !== 'revealing') return;
+        phase = 'revealed';
         bg.classList.add('is-on');
         scrim.classList.add('is-on');
-        setTimeout(function () {
-            video.classList.remove('is-live');
-            cardWrap.setAttribute('aria-hidden', 'false');
-            card.classList.add('is-in');
-            // Testton startet, wenn die Karte landet.
-            clearTimeout(audioTimer);
-            audioTimer = setTimeout(function () {
-                audio.currentTime = 0;
-                audio.play().catch(function () {});
-            }, 1400);
-        }, 1000);
-        phase = 'revealed';
+        setTimeout(function () { video.classList.remove('is-live'); }, 500);
     }
 
     function replay() {
@@ -85,6 +90,7 @@
         audio.muted = false;
         video.pause();
         video.currentTime = 0;
+        video.classList.remove('is-frost');
         card.classList.remove('is-in');
         cardWrap.setAttribute('aria-hidden', 'true');
         bg.classList.remove('is-on');
@@ -102,10 +108,10 @@
     });
     video.addEventListener('timeupdate', function () {
         if (!video.duration) return;
-        if (video.duration - video.currentTime <= 0.9) beginReveal();
+        if (video.duration - video.currentTime <= 2.5) beginReveal();
     });
-    video.addEventListener('ended', beginReveal);
-    video.addEventListener('error', beginReveal);
+    video.addEventListener('ended', freezeFrame);
+    video.addEventListener('error', freezeFrame);
     replayBtn.addEventListener('click', replay);
 
     // ---------- Player ----------
