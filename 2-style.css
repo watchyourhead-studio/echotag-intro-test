@@ -1,0 +1,219 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #efe8dc;
+    color: #4a3826;
+    -webkit-font-smoothing: antialiased;
+}
+
+.gift-root { position: fixed; inset: 0; overflow: hidden; }
+
+/* ---------- Seite hinter dem Intro ---------- */
+.gift-page {
+    position: absolute; inset: 0;
+    background-image: url('endbild.jpg');
+    background-size: cover;
+    background-position: center;
+}
+
+.gift-testbadge {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    left: 14px;
+    z-index: 3;
+    font: 600 10px/1 system-ui, sans-serif;
+    letter-spacing: 0.14em;
+    color: rgba(74, 56, 38, 0.7);
+    background: rgba(255, 252, 240, 0.7);
+    border: 1px solid rgba(74, 56, 38, 0.25);
+    border-radius: 999px;
+    padding: 4px 9px;
+}
+
+/* Buehne: entspricht exakt der gerenderten Flaeche des Hintergrundbilds (9:16) */
+.gift-stage {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    overflow: hidden;
+}
+.gift-stage-inner {
+    position: relative;
+    height: 100%;
+    aspect-ratio: 9 / 16;
+    container-type: size;
+}
+@media (min-aspect-ratio: 9/16) {
+    .gift-stage-inner { width: 100%; height: auto; }
+}
+
+/* Karteninhalt: Prozentwerte passen zur gemalten Karte im Endbild */
+.gift-card-content {
+    position: absolute;
+    left: 20%; right: 20%;
+    top: 24%; height: 40%;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.gift-eyebrow {
+    font-size: 2.6cqw;
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(122, 100, 72, 0.75);
+    margin-bottom: 1.6cqw;
+}
+.gift-heading {
+    font-size: 6.4cqw;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #43331f;
+    margin-bottom: 2.2cqw;
+}
+.gift-body {
+    font-size: 3.4cqw;
+    line-height: 1.45;
+    color: rgba(74, 56, 38, 0.85);
+    max-width: 90%;
+}
+
+/* ---------- Audioplayer im Papierlook ---------- */
+.gift-player {
+    margin-top: auto;
+    margin-bottom: 2.5cqw;
+    width: 100%;
+    background: rgba(255, 251, 240, 0.55);
+    border: 1px solid rgba(122, 100, 72, 0.3);
+    border-radius: 3.2cqw;
+    padding: 3cqw 3.4cqw 2.6cqw;
+    box-shadow: 0 0.4cqw 1.6cqw rgba(74, 56, 38, 0.12);
+    backdrop-filter: blur(2px);
+}
+.gift-player-label {
+    font-size: 2.7cqw;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: rgba(122, 100, 72, 0.9);
+    margin-bottom: 2.4cqw;
+}
+.gift-player-row {
+    display: flex;
+    align-items: center;
+    gap: 2.8cqw;
+}
+.gift-play {
+    flex: none;
+    width: 10.5cqw; height: 10.5cqw;
+    min-width: 40px; min-height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(122, 100, 72, 0.45);
+    background: #fbf5e8;
+    color: #4a3826;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 0.3cqw 1cqw rgba(74, 56, 38, 0.18);
+}
+.gift-play:active { transform: scale(0.94); }
+.gift-track {
+    flex: 1;
+    height: 32px;
+    display: flex; align-items: center;
+    cursor: pointer;
+    touch-action: none;
+}
+.gift-track::before {
+    content: '';
+    position: absolute;
+}
+.gift-track {
+    position: relative;
+}
+.gift-track::before {
+    left: 0; right: 0; height: 1.2cqw; min-height: 4px;
+    background: rgba(90, 70, 45, 0.18);
+    border-radius: 999px;
+}
+.gift-track-fill {
+    position: absolute;
+    left: 0; height: 1.2cqw; min-height: 4px;
+    background: #8a6d4a;
+    border-radius: 999px;
+    pointer-events: none;
+}
+.gift-mute {
+    flex: none;
+    width: 8cqw; height: 8cqw;
+    min-width: 32px; min-height: 32px;
+    border-radius: 50%;
+    border: 1px solid rgba(122, 100, 72, 0.3);
+    background: transparent;
+    color: rgba(74, 56, 38, 0.8);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+}
+.gift-times {
+    display: flex;
+    justify-content: space-between;
+    font-size: 2.5cqw;
+    font-variant-numeric: tabular-nums;
+    color: rgba(122, 100, 72, 0.85);
+    margin-top: 1.4cqw;
+    padding: 0 0.4cqw;
+}
+
+.gift-replay {
+    margin-bottom: 1cqw;
+    border: none;
+    background: none;
+    font-size: 2.9cqw;
+    color: rgba(74, 56, 38, 0.65);
+    text-decoration: underline;
+    text-underline-offset: 0.4em;
+    cursor: pointer;
+    padding: 8px 4px;
+}
+
+/* ---------- Intro-Overlay ---------- */
+.gift-overlay {
+    position: absolute; inset: 0;
+    z-index: 2;
+    cursor: pointer;
+    transition: opacity 1.2s ease;
+    background: #efe8dc;
+}
+.gift-overlay.is-fading { opacity: 0; pointer-events: none; }
+.gift-overlay.is-hidden { opacity: 0; pointer-events: none; }
+
+.gift-media {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+}
+
+.gift-tap-hint {
+    position: absolute;
+    top: 62%;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: #4a3826;
+    background: rgba(255, 252, 240, 0.72);
+    border: 1px solid rgba(74, 56, 38, 0.2);
+    border-radius: 999px;
+    padding: 10px 18px;
+    width: max-content;
+    margin: 0 auto;
+    backdrop-filter: blur(3px);
+    animation: giftPulse 2.2s ease-in-out infinite;
+}
+@keyframes giftPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.045); }
+}
