@@ -1,0 +1,161 @@
+(function () {
+    'use strict';
+    var stage = document.getElementById('stage');
+    var poster = document.getElementById('poster');
+    var video = document.getElementById('video');
+    var bg = document.getElementById('bg');
+    var scrim = document.getElementById('scrim');
+    var cardWrap = document.getElementById('cardWrap');
+    var card = document.getElementById('card');
+    var audio = document.getElementById('audio');
+    var playBtn = document.getElementById('playBtn');
+    var iconPlay = document.getElementById('iconPlay');
+    var iconPause = document.getElementById('iconPause');
+    var muteBtn = document.getElementById('muteBtn');
+    var iconVol = document.getElementById('iconVol');
+    var iconMute = document.getElementById('iconMute');
+    var track = document.getElementById('track');
+    var fill = document.getElementById('fill');
+    var tCur = document.getElementById('tCur');
+    var tDur = document.getElementById('tDur');
+    var replayBtn = document.getElementById('replayBtn');
+
+    var phase = 'poster';
+    var watchdog = null;
+    var seeking = false;
+    var audioTimer = null;
+
+    function fmt(t) {
+        if (!isFinite(t) || t < 0) return '0:00';
+        var m = Math.floor(t / 60);
+        var s = Math.floor(t % 60);
+        return m + ':' + String(s).padStart(2, '0');
+    }
+
+    function setPhase(p) {
+        phase = p;
+        poster.classList.toggle('is-hidden', p !== 'poster');
+        video.classList.toggle('is-live', p === 'playing' || p === 'fading');
+        if (p === 'playing') {
+            clearTimeout(watchdog);
+            // iOS: Start blieb nach Tap bei 0 stehen -> sauber zum Poster zurueck.
+            watchdog = setTimeout(function () {
+                if (phase === 'playing' && video.currentTime < 0.1 && !video.ended) setPhase('poster');
+            }, 3000);
+        }
+    }
+
+    // Ein Tap: Video MIT Ton starten und Audio-Element im selben Gesture
+    // fuer iOS entsperren, ohne es hoerbar zu machen.
+    function start() {
+        if (phase !== 'poster') return;
+        audio.muted = true;
+        audio.play().then(function () { audio.pause(); audio.currentTime = 0; audio.muted = false; }).catch(function () { audio.muted = false; });
+        video.muted = false;
+        if (video.currentTime > 0) video.currentTime = 0;
+        video.play().catch(function () { setPhase('poster'); });
+        setPhase('playing');
+    }
+
+    function beginReveal() {
+        if (phase !== 'playing') return;
+        phase = 'fading';
+        // Endbild einblenden (deckt sich mit dem eingefrorenen letzten Videoframe),
+        // dann Video ausblenden und Karte mit Eintritts-Animation holen.
+        bg.classList.add('is-on');
+        scrim.classList.add('is-on');
+        setTimeout(function () {
+            video.classList.remove('is-live');
+            cardWrap.setAttribute('aria-hidden', 'false');
+            card.classList.add('is-in');
+            // Testton startet, wenn die Karte landet.
+            clearTimeout(audioTimer);
+            audioTimer = setTimeout(function () {
+                audio.currentTime = 0;
+                audio.play().catch(function () {});
+            }, 1400);
+        }, 1000);
+        phase = 'revealed';
+    }
+
+    function replay() {
+        clearTimeout(audioTimer);
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = false;
+        video.pause();
+        video.currentTime = 0;
+        card.classList.remove('is-in');
+        cardWrap.setAttribute('aria-hidden', 'true');
+        bg.classList.remove('is-on');
+        scrim.classList.remove('is-on');
+        setPhase('poster');
+    }
+
+    poster.addEventListener('click', start);
+    video.addEventListener('timeupdate', function () {
+        if (!video.duration) return;
+        if (video.duration - video.currentTime <= 0.9) beginReveal();
+    });
+    video.addEventListener('ended', beginReveal);
+    video.addEventListener('error', beginReveal);
+    replayBtn.addEventListener('click', replay);
+
+    // ---------- Player ----------
+    playBtn.addEventListener('click', function () {
+        if (audio.paused) audio.play().catch(function () {});
+        else audio.pause();
+    });
+    muteBtn.addEventListener('click', function () {
+        audio.muted = !audio.muted;
+        iconVol.style.display = audio.muted ? 'none' : '';
+        iconMute.style.display = audio.muted ? '' : 'none';
+        muteBtn.setAttribute('aria-label', audio.muted ? 'Ton an' : 'Stumm');
+    });
+    audio.addEventListener('play', function () {
+        iconPlay.style.display = 'none';
+        iconPause.style.display = '';
+        playBtn.setAttribute('aria-label', 'Pause');
+    });
+    audio.addEventListener('pause', function () {
+        iconPlay.style.display = '';
+        iconPause.style.display = 'none';
+        playBtn.setAttribute('aria-label', 'Abspielen');
+    });
+    audio.addEventListener('ended', function () {
+        iconPlay.style.display = '';
+        iconPause.style.display = 'none';
+        audio.currentTime = 0;
+    });
+    audio.addEventListener('loadedmetadata', function () {
+        tDur.textContent = fmt(audio.duration);
+        track.setAttribute('aria-valuemax', String(Math.round(audio.duration)));
+    });
+    audio.addEventListener('timeupdate', function () {
+        if (seeking) return;
+        tCur.textContent = fmt(audio.currentTime);
+        track.setAttribute('aria-valuenow', String(Math.round(audio.currentTime)));
+        if (audio.duration > 0) fill.style.width = Math.min(100, (audio.currentTime / audio.duration) * 100) + '%';
+    });
+
+    function seekTo(clientX) {
+        if (!audio.duration) return;
+        var r = track.getBoundingClientRect();
+        var ratio = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+        audio.currentTime = ratio * audio.duration;
+        tCur.textContent = fmt(audio.currentTime);
+        fill.style.width = (ratio * 100) + '%';
+    }
+    track.addEventListener('pointerdown', function (e) {
+        seeking = true;
+        seekTo(e.clientX);
+        try { track.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    track.addEventListener('pointermove', function (e) {
+        if (seeking) seekTo(e.clientX);
+    });
+    track.addEventListener('pointerup', function () { seeking = false; });
+
+    if (audio.readyState >= 1) tDur.textContent = fmt(audio.duration);
+    setPhase('poster');
+})();
