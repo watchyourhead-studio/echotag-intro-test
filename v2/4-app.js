@@ -2,6 +2,7 @@
     'use strict';
     var stage = document.getElementById('stage');
     var taplayer = document.getElementById('taplayer');
+    var hint = document.getElementById('hint');
     var video = document.getElementById('video');
     var bg = document.getElementById('bg');
     var scrim = document.getElementById('scrim');
@@ -24,6 +25,9 @@
     var watchdog = null;
     var seeking = false;
     var audioTimer = null;
+    var HINT_DEFAULT = 'Tippen zum Oeffnen';
+    var HINT_LOADING = 'Laedt ...';
+    var HINT_RETRY = 'Nicht geladen - nochmal tippen';
 
     function fmt(t) {
         if (!isFinite(t) || t < 0) return '0:00';
@@ -32,36 +36,59 @@
         return m + ':' + String(s).padStart(2, '0');
     }
 
+    function setHint(text, loading) {
+        hint.textContent = text;
+        hint.classList.toggle('is-loading', !!loading);
+    }
+
     function setPhase(p) {
         phase = p;
-        taplayer.classList.toggle('is-hidden', p !== 'poster');
-        if (p === 'playing') {
+        taplayer.classList.toggle('is-hidden', p !== 'poster' && p !== 'loading' && p !== 'retry');
+        if (p === 'poster') setHint(HINT_DEFAULT, false);
+        if (p === 'loading') {
+            setHint(HINT_LOADING, true);
+            // Sichtbarer Fallback statt stillem Zustand, wenn der Start haengt.
             clearTimeout(watchdog);
-            // iOS: Start blieb nach Tap bei 0 stehen -> sauber zum Poster zurueck.
             watchdog = setTimeout(function () {
-                if (phase === 'playing' && video.currentTime < 0.1 && !video.ended) setPhase('poster');
-            }, 3000);
+                if (phase === 'loading' && video.currentTime < 0.1 && !video.ended) setPhase('retry');
+            }, 8000);
         }
+        if (p === 'retry') setHint(HINT_RETRY, false);
     }
 
     // Ein Tap: Video MIT Ton starten und Audio-Element im selben Gesture
     // fuer iOS entsperren, ohne es hoerbar zu machen.
     function start() {
-        if (phase !== 'poster') return;
-        audio.muted = true;
-        audio.play().then(function () { audio.pause(); audio.currentTime = 0; audio.muted = false; }).catch(function () { audio.muted = false; });
+        if (phase !== 'poster' && phase !== 'retry') return;
+        setPhase('loading');
+        try {
+            audio.muted = true;
+            var ap = audio.play();
+            if (ap && ap.then) ap.then(function () { audio.pause(); audio.currentTime = 0; audio.muted = false; }, function () { audio.muted = false; });
+        } catch (e) { audio.muted = false; }
         video.muted = false;
-        if (video.currentTime > 0) video.currentTime = 0;
-        video.play().catch(function () { setPhase('poster'); });
-        setPhase('playing');
+        try { if (video.currentTime > 0) video.currentTime = 0; } catch (e) {}
+        var vp;
+        try { vp = video.play(); } catch (e) { vp = null; }
+        if (vp && vp.catch) {
+            vp.catch(function () {
+                // Fallback: stummer Start statt gar keinem.
+                video.muted = true;
+                var vp2;
+                try { vp2 = video.play(); } catch (e) { vp2 = null; }
+                if (vp2 && vp2.catch) vp2.catch(function () { setPhase('retry'); });
+                if (!vp2) setPhase('retry');
+            });
+        } else if (!vp) {
+            video.muted = true;
+            try { video.play(); } catch (e) { setPhase('retry'); }
+        }
     }
 
     // Karte fliegt EIN, waehrend das Video dahinter weiterlaeuft.
-    // Frost-Blur zieht als Uebergang mit, Blumen bleiben sichtbar.
     function beginReveal() {
         if (phase !== 'playing') return;
         phase = 'revealing';
-        video.classList.add('is-frost');
         cardWrap.setAttribute('aria-hidden', 'false');
         card.classList.add('is-in');
         // Testton startet, wenn die Karte landet.
@@ -69,17 +96,17 @@
         audioTimer = setTimeout(function () {
             audio.currentTime = 0;
             audio.play().catch(function () {});
-        }, 1500);
+        }, 1100);
     }
 
-    // Video ist am letzten Frame angekommen: exakt dieses Standbild
-    // (identisch zum Clip-Ende) als Hintergrund halten, Video weg.
+    // Fast am Ende: auf das eingefrorene, weich gezeichnete Standbild
+    // (identisch zum letzten Videoframe) ueberblenden und halten.
     function freezeFrame() {
         if (phase !== 'revealing') return;
         phase = 'revealed';
         bg.classList.add('is-on');
         scrim.classList.add('is-on');
-        setTimeout(function () { video.classList.add('is-gone'); }, 500);
+        setTimeout(function () { video.classList.add('is-gone'); }, 600);
     }
 
     function replay() {
@@ -88,9 +115,8 @@
         audio.currentTime = 0;
         audio.muted = false;
         video.pause();
-        video.currentTime = 0;
-        video.classList.remove('is-frost');
         video.classList.remove('is-gone');
+        try { video.currentTime = 0; } catch (e) {}
         card.classList.remove('is-in');
         cardWrap.setAttribute('aria-hidden', 'true');
         bg.classList.remove('is-on');
@@ -106,9 +132,14 @@
             audio.play().catch(function () {});
         }
     });
+    video.addEventListener('playing', function () {
+        if (phase === 'loading' || phase === 'retry') setPhase('playing');
+    });
     video.addEventListener('timeupdate', function () {
         if (!video.duration) return;
-        if (video.duration - video.currentTime <= 2.5) beginReveal();
+        var rest = video.duration - video.currentTime;
+        if (rest <= 2.5) beginReveal();
+        if (rest <= 0.7) freezeFrame();
     });
     video.addEventListener('ended', freezeFrame);
     video.addEventListener('error', freezeFrame);
