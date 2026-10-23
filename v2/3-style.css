@@ -39,7 +39,7 @@ body {
 }
 
 /* --- Video --- */
-#video { z-index: 30; opacity: 1; transition: opacity .5s ease; }
+#video { z-index: 30; opacity: 1; transition: opacity .5s ease; pointer-events: none; }
 #video.is-gone { opacity: 0; }
 
 /* --- Endbild + Settle --- */
@@ -61,7 +61,7 @@ body {
 
 /* --- Karte --- */
 .card-wrap {
-  position: absolute; inset: 0; z-index: 20;
+  position: absolute; inset: 0; z-index: 45;
   display: flex; align-items: center; justify-content: center;
   pointer-events: none;
   transform-style: preserve-3d;
