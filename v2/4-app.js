@@ -6,6 +6,7 @@
     var video = document.getElementById('video');
     var bg = document.getElementById('bg');
     var scrim = document.getElementById('scrim');
+    var veil = document.getElementById('veil');
     var cardWrap = document.getElementById('cardWrap');
     var card = document.getElementById('card');
     var audio = document.getElementById('audio');
@@ -89,6 +90,7 @@
     function beginReveal() {
         if (phase !== 'playing') return;
         phase = 'revealing';
+        veil.classList.add('is-on');
         cardWrap.setAttribute('aria-hidden', 'false');
         card.classList.add('is-in');
         // Testton startet, wenn die Karte landet.
@@ -96,7 +98,7 @@
         audioTimer = setTimeout(function () {
             audio.currentTime = 0;
             audio.play().catch(function () {});
-        }, 1100);
+        }, 1300);
     }
 
     // Fast am Ende: auf das eingefrorene, weich gezeichnete Standbild
@@ -121,6 +123,7 @@
         cardWrap.setAttribute('aria-hidden', 'true');
         bg.classList.remove('is-on');
         scrim.classList.remove('is-on');
+        veil.classList.remove('is-on');
         setPhase('poster');
     }
 
@@ -138,7 +141,7 @@
     video.addEventListener('timeupdate', function () {
         if (!video.duration) return;
         var rest = video.duration - video.currentTime;
-        if (rest <= 2.5) beginReveal();
+        if (rest <= 3.5) beginReveal();
         if (rest <= 0.7) freezeFrame();
     });
     video.addEventListener('ended', freezeFrame);
