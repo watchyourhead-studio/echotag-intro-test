@@ -12,7 +12,7 @@ body {
 /* ---------- Seite hinter dem Intro ---------- */
 .gift-page {
     position: absolute; inset: 0;
-    background-image: url('endbild.jpg');
+    background-image: url('5-endbild.jpg');
     background-size: cover;
     background-position: center;
 }
@@ -120,6 +120,7 @@ body {
 }
 .gift-play:active { transform: scale(0.94); }
 .gift-track {
+    position: relative;
     flex: 1;
     height: 32px;
     display: flex; align-items: center;
@@ -129,11 +130,6 @@ body {
 .gift-track::before {
     content: '';
     position: absolute;
-}
-.gift-track {
-    position: relative;
-}
-.gift-track::before {
     left: 0; right: 0; height: 1.2cqw; min-height: 4px;
     background: rgba(90, 70, 45, 0.18);
     border-radius: 999px;
