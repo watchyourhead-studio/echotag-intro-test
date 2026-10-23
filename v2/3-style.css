@@ -43,7 +43,7 @@ body {
 /* --- Endbild + Settle --- */
 .bg {
   position: absolute; inset: -4%; z-index: 10;
-  background: url('5-endbild.jpg') center / cover no-repeat;
+  background: url('6-endbild.jpg') center / cover no-repeat;
   opacity: 0; transform: scale(1.07);
 }
 .bg.is-on {
