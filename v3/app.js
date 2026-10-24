@@ -129,25 +129,51 @@
     ctx.drawImage(img, 0, 0, cv.width, cv.height);
     if (!grainPat) makeGrain(ctx);
 
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
+    // Name auf separater Fläche backen: Off-White des Originaldrucks + Papierfasern,
+    // damit der Text wie eingedruckt wirkt statt wie aufgeklebt
+    var tCv = document.createElement('canvas');
+    tCv.width = cv.width; tCv.height = cv.height;
+    var tCtx = tCv.getContext('2d');
+    tCtx.fillStyle = '#f7f0f5';
+    tCtx.textAlign = 'left';
+    tCtx.textBaseline = 'alphabetic';
 
     // "FÜR" klein mit weiter Laufweite
     var fuerSize = 30 * S;
-    ctx.font = '500 ' + fuerSize + 'px Oswald';
-    drawSpaced(ctx, 'FÜR', cv.width / 2, 1210 * S, 10 * S);
+    tCtx.font = '500 ' + fuerSize + 'px Oswald';
+    drawSpaced(tCtx, 'FÜR', tCv.width / 2, 1210 * S, 10 * S);
 
     // Name, auf Kartenbreite passend
     var label = name.toUpperCase();
     var size = 92 * S;
-    var maxW = cv.width * 0.78;
-    ctx.font = '600 ' + size + 'px Oswald';
-    while (ctx.measureText(label).width > maxW && size > 16 * S) {
+    var maxW = tCv.width * 0.78;
+    tCtx.font = '600 ' + size + 'px Oswald';
+    while (tCtx.measureText(label).width > maxW && size > 16 * S) {
       size -= 2 * S;
-      ctx.font = '600 ' + size + 'px Oswald';
+      tCtx.font = '600 ' + size + 'px Oswald';
     }
-    ctx.fillText(label, (cv.width - ctx.measureText(label).width) / 2, 1322 * S);
+    tCtx.fillText(label, (tCv.width - tCtx.measureText(label).width) / 2, 1322 * S);
+
+    // Papierfasern in die Buchstaben holen: Artwork-Textur weich einmischen,
+    // danach auf die Textform zurückschneiden
+    tCtx.globalCompositeOperation = 'soft-light';
+    tCtx.globalAlpha = 0.55;
+    tCtx.drawImage(img, 0, 0, tCv.width, tCv.height);
+    tCtx.globalAlpha = 1;
+    var mCv = document.createElement('canvas');
+    mCv.width = tCv.width; mCv.height = tCv.height;
+    var mCtx = mCv.getContext('2d');
+    mCtx.fillStyle = '#000';
+    mCtx.textAlign = 'left';
+    mCtx.textBaseline = 'alphabetic';
+    mCtx.font = '500 ' + fuerSize + 'px Oswald';
+    drawSpaced(mCtx, 'FÜR', mCv.width / 2, 1210 * S, 10 * S);
+    mCtx.font = '600 ' + size + 'px Oswald';
+    mCtx.fillText(label, (mCv.width - mCtx.measureText(label).width) / 2, 1322 * S);
+    tCtx.globalCompositeOperation = 'destination-in';
+    tCtx.drawImage(mCv, 0, 0);
+    tCtx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(tCv, 0, 0);
 
     // Papierkorn über den Druck legen
     ctx.globalAlpha = 0.5;
@@ -185,11 +211,17 @@
     c.width = dw; c.height = dh;
     var x = c.getContext('2d');
     x.drawImage(cv, sx, sy, sw, sh, 0, 0, dw, dh);
-    // Schnittkante wirkt minimal dunkler
+    // Schnittkante matter machen: abgedunkelt + Papierkorn wie Karton
     x.globalCompositeOperation = 'multiply';
-    x.fillStyle = 'rgb(238,238,238)';
+    x.fillStyle = 'rgb(224,224,224)';
     x.fillRect(0, 0, dw, dh);
     x.globalCompositeOperation = 'source-over';
+    if (grainPat) {
+      x.globalAlpha = 0.7;
+      x.fillStyle = grainPat;
+      x.fillRect(0, 0, dw, dh);
+      x.globalAlpha = 1;
+    }
     return c;
   }
 
@@ -251,7 +283,7 @@
     backTex.encoding = THREE.sRGBEncoding;
     backTex.anisotropy = 4;
 
-    var frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.86, metalness: 0 });
+    var frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.95, metalness: 0 });
     var backMatL = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9, metalness: 0 });
     var backMatR = backMatL.clone();
 
@@ -261,7 +293,7 @@
       var t = new THREE.CanvasTexture(c);
       t.encoding = THREE.sRGBEncoding;
       t.anisotropy = 4;
-      return new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, metalness: 0 });
+      return new THREE.MeshStandardMaterial({ map: t, roughness: 1.0, metalness: 0 });
     }
     var EW = 14; // Quellstreifenbreite im Front-Canvas
     var mInL = edgeMat(edgeStrip(frontCanvas, FH - EW, 0, EW, FCH, 64, 1600));
@@ -367,7 +399,7 @@
       cardGroup.rotation.y *= 0.85; cardGroup.rotation.x *= 0.85;
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
       // Blumenwelt blendet synchron zur Öffnung ein
-      var rv = smooth(p * 1.15);
+      var rv = smooth(p * 2.2);
       revealPoster.style.opacity = rv;
       if (video.dataset.on === '1') video.style.opacity = rv;
       if (p > 0.8) glCanvas.style.opacity = Math.max(0, 1 - (p - 0.8) / 0.2);
@@ -513,7 +545,7 @@
     if (phase === 'opening' || phase === 'flight') taplayer.classList.add('is-hidden');
     if (phase === 'opening' || phase === 'flight') {
       var p = phase === 'flight' ? 1 : clamp((performance.now() - openStart) / OPEN_MS, 0, 1);
-      video.style.opacity = smooth(p * 1.15);
+      video.style.opacity = smooth(p * 2.2);
     }
   });
   video.addEventListener('timeupdate', function () {
