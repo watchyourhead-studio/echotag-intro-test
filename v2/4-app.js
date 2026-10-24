@@ -46,8 +46,15 @@
         hint.classList.toggle('is-loading', !!loading);
     }
 
+    function syncCloseReady() {
+        var ready = phase === 'revealed' && revReady && videoRev.readyState >= 2 && !closing;
+        replayBtn.classList.toggle('is-ready', ready);
+        replayBtn.disabled = !ready;
+    }
+
     function setPhase(p) {
         phase = p;
+        syncCloseReady();
         taplayer.classList.toggle('is-hidden', p !== 'poster' && p !== 'loading' && p !== 'retry');
         if (p === 'poster') setHint(HINT_DEFAULT, false);
         if (p === 'loading') {
@@ -110,6 +117,7 @@
     function freezeFrame() {
         if (phase !== 'revealing') return;
         phase = 'revealed';
+        syncCloseReady();
         bg.classList.add('is-on');
         scrim.classList.add('is-on');
         setTimeout(function () { video.classList.add('is-gone'); }, 600);
@@ -153,15 +161,16 @@
             videoRev.load();
         }
     });
-    videoRev.addEventListener('canplay', function () { revReady = true; });
-    videoRev.addEventListener('error', function () { revReady = false; });
+    videoRev.addEventListener('canplay', function () { revReady = true; syncCloseReady(); });
+    videoRev.addEventListener('error', function () { revReady = false; syncCloseReady(); });
 
     // Alles rueckwaerts: Player+Blur zurueck, Video rueckwaerts, Karte zu.
     function close() {
         if (phase !== 'revealed' || closing) return;
-        if (!revReady) { replay(); return; }
+        if (!revReady || videoRev.readyState < 2) { syncCloseReady(); return; }
         closing = true;
         phase = 'closing';
+        replayBtn.disabled = true;
         replayBtn.classList.add('is-disabled');
         clearTimeout(audioTimer);
         audio.pause();
