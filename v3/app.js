@@ -362,8 +362,10 @@
   function open() {
     if (phase !== 'closed' && phase !== 'retry') return;
     phase = 'opening';
-    setHint('', false);
-    taplayer.classList.add('is-hidden');
+    taplayer.classList.add('is-pass');
+    // Sofortiges Ladefeedback nach dem Tippen, falls das Video noch nicht bereit ist
+    if (video.dataset.on !== '1') setHint(HINT_LOADING, true);
+    else taplayer.classList.add('is-hidden');
 
     // Testton im selben Gesture stumm entsperren (iOS)
     try {
@@ -388,14 +390,11 @@
     watchdog = setTimeout(function () {
       if (video.dataset.on !== '1' && (phase === 'opening' || phase === 'flight')) {
         taplayer.classList.remove('is-hidden');
+        taplayer.classList.remove('is-pass');
         setHint(HINT_RETRY, false);
         phase = 'retry';
       }
     }, 9000);
-    setTimeout(function () {
-      if (video.dataset.on !== '1' && phase === 'opening') setHint(HINT_LOADING, true);
-    }, 500);
-
     if (renderer) {
       swayOn = false;
       glCanvas.style.opacity = 1;
@@ -464,6 +463,7 @@
       fallback.style.opacity = 1;
     }
     taplayer.classList.remove('is-hidden');
+    taplayer.classList.remove('is-pass');
     setHint(HINT_DEFAULT, false);
     phase = 'closed';
   }
@@ -480,6 +480,7 @@
   });
   video.addEventListener('playing', function () {
     video.dataset.on = '1';
+    if (phase === 'opening' || phase === 'flight') taplayer.classList.add('is-hidden');
     if (phase === 'opening' || phase === 'flight') {
       var p = phase === 'flight' ? 1 : clamp((performance.now() - openStart) / OPEN_MS, 0, 1);
       video.style.opacity = smooth(p * 1.15);
