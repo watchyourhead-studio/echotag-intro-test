@@ -78,13 +78,13 @@ body {
 }
 .card {
   width: 80%; max-width: 340px;
-  background: rgba(255,253,250,.52);
-  -webkit-backdrop-filter: blur(18px) saturate(1.35);
-  backdrop-filter: blur(18px) saturate(1.35);
-  border: 1px solid rgba(255,255,255,.55);
-  border-radius: 20px;
-  padding: 20px 18px 14px;
-  box-shadow: 0 24px 70px rgba(10,4,8,.45), 0 4px 18px rgba(10,4,8,.25);
+  background: rgba(255,253,252,.90);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  backdrop-filter: blur(16px) saturate(1.25);
+  border: 1px solid rgba(224,32,128,.16);
+  border-radius: 22px;
+  padding: 22px 20px 16px;
+  box-shadow: 0 24px 70px rgba(43,8,26,.38), 0 4px 18px rgba(43,8,26,.20), 0 2px 24px rgba(224,32,128,.10);
   text-align: center;
   pointer-events: auto;
   opacity: 0;
@@ -113,22 +113,27 @@ body {
 .card.is-in .anim-item[data-i="3"] { animation-delay: .92s; }
 @keyframes itemIn { to { opacity: 1; transform: translateY(0); } }
 
-.card-eyebrow { font-size: 10px; letter-spacing: .28em; text-transform: uppercase; color: #a98a96; margin-bottom: 4px; }
-.card-title { font-size: 21px; font-weight: 700; letter-spacing: .01em; color: #33222a; margin-bottom: 14px; }
+.card-eyebrow {
+  display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: .22em;
+  text-transform: uppercase; color: #b01764;
+  background: rgba(224,32,128,.10); border-radius: 999px;
+  padding: 4px 11px 4px 12px; margin-bottom: 10px;
+}
+.card-title { font-size: 22px; font-weight: 700; letter-spacing: -.01em; color: #2a121d; margin-bottom: 6px; }
 
-.player-label { font-size: 11px; color: #8a7a81; margin-bottom: 8px; }
-.player-row { display: flex; align-items: center; gap: 10px; }
+.player-label { font-size: 11.5px; color: #8e6e79; margin-bottom: 14px; }
+.player-row { display: flex; align-items: center; gap: 12px; }
 .play {
-  position: relative; width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer;
-  background: #c2185b; color: #fff;
+  position: relative; width: 48px; height: 48px; border-radius: 50%; border: none; cursor: pointer;
+  background: #e02080; color: #fff;
   display: flex; align-items: center; justify-content: center; flex: none;
-  box-shadow: 0 6px 18px rgba(194,24,91,.4);
+  box-shadow: 0 8px 20px rgba(224,32,128,.35);
   transition: transform .15s ease;
 }
 .play:active { transform: scale(.94); }
 .play .pulse {
   position: absolute; inset: 0; border-radius: 50%;
-  border: 2px solid rgba(194,24,91,.55);
+  border: 2px solid rgba(224,32,128,.55);
   opacity: 0; pointer-events: none;
 }
 .card.is-in .play .pulse { animation: pulseRing 1.5s ease-out 1.4s 2; }
@@ -136,12 +141,22 @@ body {
   0% { opacity: .9; transform: scale(1); }
   100% { opacity: 0; transform: scale(1.9); }
 }
-.track { flex: 1; height: 6px; border-radius: 3px; background: #ecdee3; position: relative; cursor: pointer; touch-action: none; }
-.track-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; border-radius: 3px; background: #c2185b; }
-.mute { background: none; border: none; color: #8a7a81; cursor: pointer; padding: 6px; display: flex; }
-.times { display: flex; justify-content: space-between; font-size: 11px; color: #8a7a81; margin-top: 6px; }
+.track { flex: 1; height: 6px; border-radius: 999px; background: rgba(42,18,29,.10); position: relative; cursor: pointer; touch-action: none; }
+.track-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; border-radius: 999px; background: #e02080; }
+.track-fill::after {
+  content: ""; position: absolute; right: -7px; top: 50%;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 2.5px solid #e02080;
+  transform: translateY(-50%);
+  box-shadow: 0 1px 5px rgba(43,8,26,.25);
+}
+.mute { background: none; border: none; color: #7a5a67; cursor: pointer; padding: 10px; margin: -10px -6px -10px 0; display: flex; }
+.times { display: flex; justify-content: space-between; font-size: 11px; font-variant-numeric: tabular-nums; color: #a98a96; margin-top: 8px; }
 
 .replay {
-  margin-top: 12px; background: none; border: none; cursor: pointer;
-  font-size: 12px; color: #7a6a71; text-decoration: underline; text-underline-offset: 3px;
+  margin-top: 16px; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: #b01764;
+  background: rgba(255,255,255,.35);
+  border: 1px solid rgba(224,32,128,.35); border-radius: 999px;
+  padding: 9px 18px;
 }
