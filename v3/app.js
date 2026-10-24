@@ -7,6 +7,7 @@
   var OPEN_MS = 1700;     // Dauer der Gatefold-Öffnung
   var OPEN_ANGLE = 2.96;  // ~170 Grad
   var CARD_W = 905, CARD_H = 1600;
+  var THICK = 0.055;    // Materialstärke der Karte (dicke Kartonage)
 
   // ---------- URL-Parameter ----------
   var qs = new URLSearchParams(location.search);
@@ -178,34 +179,29 @@
     return cv;
   }
 
+  // Streifen aus der gebackenen Vorderseite für die Kanten (Druck läuft um die Ecke)
+  function edgeStrip(cv, sx, sy, sw, sh, dw, dh) {
+    var c = document.createElement('canvas');
+    c.width = dw; c.height = dh;
+    var x = c.getContext('2d');
+    x.drawImage(cv, sx, sy, sw, sh, 0, 0, dw, dh);
+    // Schnittkante wirkt minimal dunkler
+    x.globalCompositeOperation = 'multiply';
+    x.fillStyle = 'rgb(238,238,238)';
+    x.fillRect(0, 0, dw, dh);
+    x.globalCompositeOperation = 'source-over';
+    return c;
+  }
+
   // ============================================================
   //  3D-Gatefold
   // ============================================================
   var renderer = null, scene, camera, cardGroup, pivL, pivR, blobShadow;
-  var bendGeos = []; // {geo, base}
   var halfW, cardH = 3.3, z0 = 8;
   var rafId = null, lastFrame = 0;
   var swayOn = true, swayT = 0;
   var openStart = 0, frozenP = null;
   var glFailed = false;
-
-  function storeBase(geo) {
-    bendGeos.push({ geo: geo, base: geo.attributes.position.array.slice() });
-  }
-  function bendGeo(entry, amt) {
-    var pos = entry.geo.attributes.position;
-    var base = entry.base;
-    for (var i = 0; i < pos.count; i++) {
-      var x = base[3 * i];
-      var f = Math.abs(x) / halfW;
-      pos.setZ(i, base[3 * i + 2] + amt * f * f);
-    }
-    pos.needsUpdate = true;
-    entry.geo.computeVertexNormals();
-  }
-  function bendAll(amt) {
-    for (var i = 0; i < bendGeos.length; i++) bendGeo(bendGeos[i], amt);
-  }
 
   function initGL(frontCanvas, backCanvas) {
     try {
@@ -217,12 +213,12 @@
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
 
-    var hemi = new THREE.HemisphereLight(0xfff8f0, 0xdcc9c2, 0.85);
+    var hemi = new THREE.HemisphereLight(0xfff8f0, 0xdcc9c2, 0.42);
     scene.add(hemi);
-    var key = new THREE.DirectionalLight(0xffffff, 1.05);
+    var key = new THREE.DirectionalLight(0xffffff, 0.6);
     key.position.set(-2.4, 3.4, 5.2);
     scene.add(key);
-    var fillLight = new THREE.DirectionalLight(0xffe9f1, 0.25);
+    var fillLight = new THREE.DirectionalLight(0xffe9f1, 0.1);
     fillLight.position.set(3, -1.5, 4);
     scene.add(fillLight);
 
@@ -259,28 +255,62 @@
     var backMatL = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9, metalness: 0 });
     var backMatR = backMatL.clone();
 
+    // Kantenmaterialien: Druck (inkl. Name) läuft um die Ecke wie bei dickem Karton
+    var FCW = frontCanvas.width, FCH = frontCanvas.height, FH = FCW / 2;
+    function edgeMat(c) {
+      var t = new THREE.CanvasTexture(c);
+      t.encoding = THREE.sRGBEncoding;
+      t.anisotropy = 4;
+      return new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, metalness: 0 });
+    }
+    var EW = 14; // Quellstreifenbreite im Front-Canvas
+    var mInL = edgeMat(edgeStrip(frontCanvas, FH - EW, 0, EW, FCH, 64, 1600));
+    var mOutL = edgeMat(edgeStrip(frontCanvas, 0, 0, EW, FCH, 64, 1600));
+    var mInR = edgeMat(edgeStrip(frontCanvas, FH, 0, EW, FCH, 64, 1600));
+    var mOutR = edgeMat(edgeStrip(frontCanvas, FCW - EW, 0, EW, FCH, 64, 1600));
+    var mTopL = edgeMat(edgeStrip(frontCanvas, 0, 0, FH, EW, 800, 64));
+    var mBotL = edgeMat(edgeStrip(frontCanvas, 0, FCH - EW, FH, EW, 800, 64));
+    var mTopR = edgeMat(edgeStrip(frontCanvas, FH, 0, FH, EW, 800, 64));
+    var mBotR = edgeMat(edgeStrip(frontCanvas, FH, FCH - EW, FH, EW, 800, 64));
+
     function wing(side) {
-      // side: 'L' -> Welt x in [-2*halfW, -halfW]... Aufbau lokal x in [0, halfW], Pivot an der Außenkante
-      var g = new THREE.PlaneGeometry(halfW, cardH, 30, 2);
-      var i, uv = g.attributes.uv;
-      if (side === 'L') {
-        g.translate(halfW / 2, 0, 0);           // lokal x: 0 (Scharnier außen) bis halfW (Mitte)
-        for (i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * 0.5);
-      } else {
-        g.translate(-halfW / 2, 0, 0);          // lokal x: -halfW (Mitte) bis 0 (Scharnier außen)
-        for (i = 0; i < uv.count; i++) uv.setX(i, 0.5 + uv.getX(i) * 0.5);
-      }
-      var gb = new THREE.PlaneGeometry(halfW, cardH, 30, 2);
-      gb.rotateY(Math.PI);
-      if (side === 'L') { gb.translate(halfW / 2, 0, -0.004); }
-      else { gb.translate(-halfW / 2, 0, -0.004); }
-
-      var mf = new THREE.Mesh(g, frontMat);
-      var mb = new THREE.Mesh(gb, side === 'L' ? backMatL : backMatR);
-      storeBase(g); storeBase(gb);
-
+      // Starrer, dicker Flügel: Front z=0, Rückseite z=-THICK, 4 bedruckte Kanten
+      var L = side === 'L';
+      var xOff = L ? halfW / 2 : -halfW / 2;
       var pivot = new THREE.Group();
-      pivot.add(mf); pivot.add(mb);
+
+      var g = new THREE.PlaneGeometry(halfW, cardH);
+      var i, uv = g.attributes.uv;
+      for (i = 0; i < uv.count; i++) uv.setX(i, L ? uv.getX(i) * 0.5 : 0.5 + uv.getX(i) * 0.5);
+      g.translate(xOff, 0, 0);
+      pivot.add(new THREE.Mesh(g, frontMat));
+
+      var gb = new THREE.PlaneGeometry(halfW, cardH);
+      gb.rotateY(Math.PI);
+      gb.translate(xOff, 0, -THICK);
+      pivot.add(new THREE.Mesh(gb, L ? backMatL : backMatR));
+
+      var xIn = L ? halfW : -halfW;   // Falz (Kartenmitte)
+      var gi = new THREE.PlaneGeometry(THICK, cardH);
+      gi.rotateY(L ? Math.PI / 2 : -Math.PI / 2);
+      gi.translate(xIn, 0, -THICK / 2);
+      pivot.add(new THREE.Mesh(gi, L ? mInL : mInR));
+
+      var go = new THREE.PlaneGeometry(THICK, cardH);
+      go.rotateY(L ? -Math.PI / 2 : Math.PI / 2);
+      go.translate(0, 0, -THICK / 2);
+      pivot.add(new THREE.Mesh(go, L ? mOutL : mOutR));
+
+      var gt = new THREE.PlaneGeometry(halfW, THICK);
+      gt.rotateX(-Math.PI / 2);
+      gt.translate(xOff, cardH / 2, -THICK / 2);
+      pivot.add(new THREE.Mesh(gt, L ? mTopL : mTopR));
+
+      var gbo = new THREE.PlaneGeometry(halfW, THICK);
+      gbo.rotateX(Math.PI / 2);
+      gbo.translate(xOff, -cardH / 2, -THICK / 2);
+      pivot.add(new THREE.Mesh(gbo, L ? mBotL : mBotR));
+
       return pivot;
     }
 
@@ -330,10 +360,10 @@
       var theta = e * OPEN_ANGLE;
       pivL.rotation.y = -theta;
       pivR.rotation.y = theta;
-      var curl = Math.sin(Math.PI * Math.min(1, p * 1.12)) * halfW * 0.30;
-      bendAll(curl);
-      // Kamera schiebt durch das Tor
+      // Kamera schiebt durch das Tor; Karte läuft dabei aus dem Fokus (Kamerafahrt)
       camera.position.z = z0 * (1 - 0.58 * smooth((p - 0.22) / 0.78));
+      var blur = p > 0.2 ? Math.pow(smooth((p - 0.2) / 0.7), 1.1) * 10 : 0;
+      glCanvas.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(1) + 'px)' : '';
       cardGroup.rotation.y *= 0.85; cardGroup.rotation.x *= 0.85;
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
       // Blumenwelt blendet synchron zur Öffnung ein
@@ -452,7 +482,7 @@
     if (renderer) {
       frozenP = null;
       pivL.rotation.y = 0; pivR.rotation.y = 0;
-      bendAll(0);
+      glCanvas.style.filter = '';
       camera.position.set(0, 0, z0);
       cardGroup.rotation.set(0, 0, 0);
       if (blobShadow) blobShadow.material.opacity = 1;
