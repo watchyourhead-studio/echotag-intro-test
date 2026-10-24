@@ -101,7 +101,7 @@ body {
   60%  { opacity: 1; filter: blur(0); }
   100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0); filter: blur(0); }
 }
-.card-badge { position: absolute; top: 8px; left: 8px; }
+.card-badge { position: absolute; top: 14px; left: 14px; }
 
 .anim-item { opacity: 0; transform: translateY(16px); }
 .card.is-in .anim-item {
@@ -141,7 +141,7 @@ body {
   0% { opacity: .9; transform: scale(1); }
   100% { opacity: 0; transform: scale(1.9); }
 }
-.track { flex: 1; height: 6px; border-radius: 999px; background: rgba(42,18,29,.10); position: relative; cursor: pointer; touch-action: none; }
+.track { flex: 1; height: 6px; border-radius: 999px; background: rgba(42,18,29,.10); position: relative; cursor: pointer; touch-action: none; margin: 0 8px 0 9px; }
 .track-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; border-radius: 999px; background: #e02080; }
 .track-fill::after {
   content: ""; position: absolute; right: -7px; top: 50%;
