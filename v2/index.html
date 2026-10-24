@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a0f14">
 <title>B&amp;B Preview Demo</title>
-<link rel="stylesheet" href="3-style.css?v=21">
+<link rel="stylesheet" href="3-style.css?v=22">
 </head>
 <body>
 <div class="root">
@@ -18,7 +18,10 @@
     <video id="video" src="1-8-intro.mp4" class="media" playsinline webkit-playsinline="true" preload="auto"></video>
     <video id="videoRev" src="1-intro-rev.mp4" class="media" playsinline webkit-playsinline="true" preload="none" muted></video>
     <div class="taplayer" id="taplayer" role="button" aria-label="Video starten">
-      <div class="tap-hint" id="hint">Tippen zum Öffnen</div>
+      <div class="start-cues">
+        <div class="sound-hint"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6v4h3l4 3V3L5 6H2Z"/><path d="M11 5.5a4 4 0 0 1 0 5M13 3.5a7 7 0 0 1 0 9"/></svg><span>Ton an für das beste Erlebnis</span></div>
+        <div class="tap-hint" id="hint">Tippen zum Öffnen</div>
+      </div>
       <span class="testbadge">TEST</span>
     </div>
 
@@ -51,6 +54,6 @@
   </div>
   <audio id="audio" src="3-sample-audio.mp3" preload="auto"></audio>
 </div>
-<script src="4-app.js?v=21"></script>
+<script src="4-app.js?v=22"></script>
 </body>
 </html>
