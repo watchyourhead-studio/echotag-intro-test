@@ -157,11 +157,16 @@ body {
 .mute { background: none; border: none; color: #7a5a67; cursor: pointer; padding: 10px; margin: -10px -6px -10px 0; display: flex; }
 .times { display: flex; justify-content: space-between; font-size: 11px; font-variant-numeric: tabular-nums; color: #a98a96; margin-top: 8px; }
 
-.card.is-out {
-  animation: cardIn .9s cubic-bezier(.2,1.28,.3,1) .6s both;
-  animation-direction: reverse;
+@keyframes cardOut {
+  0%   { opacity: 1; transform: translateY(0) scale(1) rotateX(0); filter: blur(0); }
+  40%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 0; transform: translateY(90px) scale(.55) rotateX(22deg); filter: blur(16px); }
 }
-.card.is-out .anim-item { animation: itemIn .7s cubic-bezier(.22,1,.36,1) both; animation-direction: reverse; }
+@keyframes itemOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(16px); } }
+.card.is-out {
+  animation: cardOut .9s cubic-bezier(.7,0,.8,1) .6s both;
+}
+.card.is-out .anim-item { animation: itemOut .7s cubic-bezier(.64,0,.78,0) both; }
 .card.is-out .anim-item[data-i="3"] { animation-delay: 0s; }
 .card.is-out .anim-item[data-i="2"] { animation-delay: .24s; }
 .card.is-out .anim-item[data-i="1"] { animation-delay: .38s; }
