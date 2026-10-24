@@ -1,0 +1,151 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: #f3ebe2;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+}
+.stage {
+  position: fixed; inset: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 42%, #f7f0e8 0%, #f3ebe2 55%, #ece1d5 100%);
+}
+
+/* --- Blumenwelt hinter der 3D-Karte --- */
+.reveal {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; opacity: 0; pointer-events: none;
+}
+#video { transition: opacity .35s ease; }
+.endbg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; opacity: 0; pointer-events: none;
+  transition: opacity .9s ease;
+}
+.endbg.is-on { opacity: 1; }
+
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* --- Fallback ohne WebGL --- */
+.fallback {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+}
+.fallback[hidden] { display: none; }
+.fallback img { height: 78%; max-width: 88%; border-radius: 6px; box-shadow: 0 24px 60px rgba(88,44,66,.28); }
+
+/* --- Uebergangs-Mattierung vor der Player-Karte --- */
+.veil {
+  position: absolute; inset: 0; z-index: 35;
+  -webkit-backdrop-filter: blur(9px) brightness(.97);
+  backdrop-filter: blur(9px) brightness(.97);
+  opacity: 0; pointer-events: none;
+  transition: opacity 1.0s ease .05s;
+}
+.veil.is-on { opacity: 1; }
+
+/* --- Tap-Ebene / Hinweis --- */
+.taplayer { position: absolute; inset: 0; z-index: 40; cursor: pointer; }
+.taplayer.is-hidden { display: none; }
+.tap-hint {
+  position: absolute; left: 50%; bottom: max(7%, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: rgba(255,253,250,.94); color: #4a3a41;
+  padding: 11px 24px; border-radius: 999px; font-size: 14px; letter-spacing: .03em;
+  box-shadow: 0 8px 26px rgba(88,44,66,.22);
+  animation: hintFloat 2.6s ease-in-out infinite;
+  white-space: nowrap;
+}
+@keyframes hintFloat { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-6px); } }
+.tap-hint.is-loading { animation: none; opacity: .78; }
+.testbadge {
+  position: absolute; top: max(12px, env(safe-area-inset-top)); left: 12px; z-index: 60;
+  background: rgba(74,58,65,.5); color: #fff; font-size: 10px; letter-spacing: .14em;
+  padding: 4px 9px; border-radius: 5px; font-weight: 600;
+}
+
+/* --- Player-Karte --- */
+.card-wrap {
+  position: absolute; inset: 0; z-index: 45;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.card {
+  width: 82%; max-width: 350px;
+  background: #fffdfb;
+  border: 1px solid rgba(242,58,133,.10);
+  border-radius: 26px;
+  box-shadow: 0 30px 80px rgba(88,44,66,.34), 0 4px 18px rgba(88,44,66,.16);
+  padding: 30px 26px 22px;
+  text-align: center;
+  position: relative;
+  opacity: 0;
+  transform: translateY(46px) scale(.94);
+  transition: opacity .55s ease, transform .75s cubic-bezier(.2,.9,.25,1.08);
+}
+.card.is-in { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.card-badge { top: 10px; left: 10px; background: rgba(242,58,133,.16); color: #a91c5b; }
+.card-eyebrow {
+  font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+  color: #f23a85; font-weight: 600; margin-bottom: 8px;
+}
+.card-title {
+  font-family: 'Oswald', -apple-system, 'Segoe UI', Arial, sans-serif;
+  font-weight: 600; font-size: 27px; letter-spacing: .01em;
+  color: #33222b; margin-bottom: 18px;
+}
+.card .anim-item { opacity: 0; transform: translateY(10px); transition: opacity .45s ease, transform .55s ease; }
+.card.is-in .anim-item { opacity: 1; transform: translateY(0); }
+.card.is-in .anim-item[data-i="0"] { transition-delay: .12s; }
+.card.is-in .anim-item[data-i="1"] { transition-delay: .2s; }
+.card.is-in .anim-item[data-i="2"] { transition-delay: .3s; }
+.card.is-in .anim-item[data-i="3"] { transition-delay: .4s; }
+
+.player { margin: 2px 0 12px; }
+.player-label {
+  font-size: 11.5px; letter-spacing: .06em; color: #9b7c8c;
+  text-transform: uppercase; margin-bottom: 10px; font-weight: 600;
+}
+.player-row { display: flex; align-items: center; gap: 12px; }
+.play {
+  width: 52px; height: 52px; flex: 0 0 52px; border-radius: 50%;
+  background: #f23a85; color: #fff; border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 20px rgba(242,58,133,.38);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.play:active { transform: scale(.93); box-shadow: 0 4px 12px rgba(242,58,133,.3); }
+.track {
+  position: relative; flex: 1; height: 26px; cursor: pointer;
+  display: flex; align-items: center;
+}
+.track::before {
+  content: ''; position: absolute; left: 0; right: 0; height: 6px;
+  border-radius: 3px; background: #f6dde8;
+}
+.track-fill {
+  position: absolute; left: 0; height: 6px; width: 0;
+  border-radius: 3px; background: #f23a85;
+}
+.mute {
+  width: 38px; height: 38px; flex: 0 0 38px; border-radius: 50%;
+  background: transparent; color: #b08a9d; border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.mute:active { background: #fbeaf2; }
+.times {
+  display: flex; justify-content: space-between;
+  margin-top: 6px; padding: 0 50px 0 64px;
+  font-size: 11.5px; color: #b08a9d; font-variant-numeric: tabular-nums;
+}
+.replay {
+  background: transparent; border: 0; cursor: pointer;
+  color: #f23a85; font-size: 13.5px; font-weight: 600; letter-spacing: .02em;
+  padding: 10px 16px 4px;
+}
+.replay:active { opacity: .6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tap-hint { animation: none; }
+  .card { transition: opacity .3s ease; transform: none; }
+}
