@@ -198,10 +198,23 @@
         setPhase('poster');
     }
     videoRev.addEventListener('ended', finishClose);
+    function confirmVisiblePlayback(mediaTime) {
+        if ((phase === 'loading' || phase === 'retry') && !video.paused && mediaTime >= 0.1) {
+            clearTimeout(watchdog);
+            setPhase('playing');
+        }
+    }
     video.addEventListener('playing', function () {
-        if (phase === 'loading' || phase === 'retry') setPhase('playing');
+        if (video.requestVideoFrameCallback) {
+            var checkFrame = function (now, metadata) {
+                confirmVisiblePlayback(metadata.mediaTime);
+                if (phase === 'loading' || phase === 'retry') video.requestVideoFrameCallback(checkFrame);
+            };
+            video.requestVideoFrameCallback(checkFrame);
+        }
     });
     video.addEventListener('timeupdate', function () {
+        if (!video.requestVideoFrameCallback) confirmVisiblePlayback(video.currentTime);
         if (!video.duration) return;
         var rest = video.duration - video.currentTime;
         if (rest <= 4.5) beginReveal();
