@@ -167,9 +167,8 @@
         audio.pause();
         card.classList.remove('is-in');
         card.classList.add('is-out');
-        veil.classList.remove('is-on');
-        scrim.classList.remove('is-on');
-        bg.classList.remove('is-on');
+        setTimeout(function () { veil.classList.remove('is-on'); }, 900);
+        setTimeout(function () { scrim.classList.remove('is-on'); bg.classList.remove('is-on'); }, 1500);
         try { video.currentTime = 0.04; } catch (e) {}
         videoRev.classList.add('is-on');
         try { videoRev.currentTime = 0; } catch (e) {}
