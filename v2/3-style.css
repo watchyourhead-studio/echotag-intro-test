@@ -171,9 +171,12 @@ body {
 .card.is-out .anim-item[data-i="2"] { animation-delay: .24s; }
 .card.is-out .anim-item[data-i="1"] { animation-delay: .38s; }
 .card.is-out .anim-item[data-i="0"] { animation-delay: .5s; }
+.replay.is-ready { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .45s ease, visibility 0s; }
 .replay.is-disabled { opacity: .45; pointer-events: none; }
 
 .replay {
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .45s ease, visibility 0s linear .45s;
   margin-top: 16px; cursor: pointer;
   font-size: 12.5px; font-weight: 600; color: #b01764;
   background: rgba(255,255,255,.35);
