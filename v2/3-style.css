@@ -158,14 +158,14 @@ body {
 .times { display: flex; justify-content: space-between; font-size: 11px; font-variant-numeric: tabular-nums; color: #a98a96; margin-top: 8px; }
 
 .card.is-out {
-  animation: cardIn .9s cubic-bezier(.2,1.28,.3,1) 0s both;
+  animation: cardIn .9s cubic-bezier(.2,1.28,.3,1) .6s both;
   animation-direction: reverse;
 }
-.card.is-out .anim-item { animation: itemIn .5s cubic-bezier(.22,1,.36,1) both; animation-direction: reverse; }
+.card.is-out .anim-item { animation: itemIn .7s cubic-bezier(.22,1,.36,1) both; animation-direction: reverse; }
 .card.is-out .anim-item[data-i="3"] { animation-delay: 0s; }
-.card.is-out .anim-item[data-i="2"] { animation-delay: .06s; }
-.card.is-out .anim-item[data-i="1"] { animation-delay: .12s; }
-.card.is-out .anim-item[data-i="0"] { animation-delay: .18s; }
+.card.is-out .anim-item[data-i="2"] { animation-delay: .24s; }
+.card.is-out .anim-item[data-i="1"] { animation-delay: .38s; }
+.card.is-out .anim-item[data-i="0"] { animation-delay: .5s; }
 .replay.is-disabled { opacity: .45; pointer-events: none; }
 
 .replay {
