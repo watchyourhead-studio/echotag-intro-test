@@ -21,6 +21,10 @@
     var tCur = document.getElementById('tCur');
     var tDur = document.getElementById('tDur');
     var replayBtn = document.getElementById('replayBtn');
+    var videoRev = document.getElementById('videoRev');
+    var closing = false;
+    var revReady = false;
+    var revKick = false;
 
     var phase = 'poster';
     var watchdog = null;
@@ -139,7 +143,53 @@
         if (phase === 'poster' && video.currentTime === 0) {
             try { video.currentTime = 0.04; } catch (e) {}
         }
+        video.classList.add('is-live');
     });
+    video.addEventListener('playing', function () {
+        video.classList.add('is-live');
+        if (!revKick) {
+            revKick = true;
+            videoRev.preload = 'auto';
+            videoRev.load();
+        }
+    });
+    videoRev.addEventListener('canplay', function () { revReady = true; });
+    videoRev.addEventListener('error', function () { revReady = false; });
+
+    // Alles rueckwaerts: Player+Blur zurueck, Video rueckwaerts, Karte zu.
+    function close() {
+        if (phase !== 'revealed' || closing) return;
+        if (!revReady) { replay(); return; }
+        closing = true;
+        phase = 'closing';
+        replayBtn.classList.add('is-disabled');
+        clearTimeout(audioTimer);
+        audio.pause();
+        card.classList.remove('is-in');
+        card.classList.add('is-out');
+        veil.classList.remove('is-on');
+        scrim.classList.remove('is-on');
+        bg.classList.remove('is-on');
+        try { video.currentTime = 0.04; } catch (e) {}
+        videoRev.classList.add('is-on');
+        try { videoRev.currentTime = 0; } catch (e) {}
+        var rp;
+        try { rp = videoRev.play(); } catch (e) { rp = null; }
+        if (rp && rp.catch) rp.catch(function () { finishClose(); });
+        if (!rp) finishClose();
+    }
+    function finishClose() {
+        if (!closing) return;
+        videoRev.pause();
+        video.classList.remove('is-gone');
+        setTimeout(function () { videoRev.classList.remove('is-on'); }, 350);
+        card.classList.remove('is-out');
+        cardWrap.setAttribute('aria-hidden', 'true');
+        closing = false;
+        replayBtn.classList.remove('is-disabled');
+        setPhase('poster');
+    }
+    videoRev.addEventListener('ended', finishClose);
     video.addEventListener('playing', function () {
         if (phase === 'loading' || phase === 'retry') setPhase('playing');
     });
@@ -150,7 +200,7 @@
     });
     video.addEventListener('ended', freezeFrame);
     video.addEventListener('error', freezeFrame);
-    replayBtn.addEventListener('click', replay);
+    replayBtn.addEventListener('click', close);
 
     // ---------- Player ----------
     playBtn.addEventListener('click', function () {
