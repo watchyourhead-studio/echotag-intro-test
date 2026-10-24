@@ -54,6 +54,7 @@
 
     function setPhase(p) {
         phase = p;
+        taplayer.classList.toggle('is-poster', p === 'poster');
         syncCloseReady();
         taplayer.classList.toggle('is-hidden', p !== 'poster' && p !== 'loading' && p !== 'retry');
         if (p === 'poster') setHint(HINT_DEFAULT, false);
