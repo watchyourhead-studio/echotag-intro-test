@@ -11,7 +11,7 @@
 
   // ---------- URL-Parameter ----------
   var qs = new URLSearchParams(location.search);
-  var recipient = (qs.get('name') || 'Max').replace(/\s+/g, ' ').trim().slice(0, 24) || 'Max';
+  var recipient = (qs.get('name') || 'Julia').replace(/\s+/g, ' ').trim().slice(0, 24) || 'Julia';
   var debugState = qs.get('state');
   var debugT = qs.has('t') ? parseFloat(qs.get('t')) : null;
 
@@ -356,14 +356,15 @@
   }
 
   function fit() {
-    var w = window.innerWidth, h = window.innerHeight;
+    var w = stage.clientWidth || window.innerWidth, h = stage.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     var fovR = camera.fov * Math.PI / 360;
-    var distH = (cardH / 2) / Math.tan(fovR) / 0.74;
-    var distW = halfW / (Math.tan(fovR) * camera.aspect) / 0.86;
-    z0 = Math.max(distH, distW);
+    // Cover-Fit wie bei v2: Karte fuellt die Buehne randlos (leichter Ueberstand gegen Sway-Raender)
+    var distH = (cardH / 2) / Math.tan(fovR);
+    var distW = halfW / (Math.tan(fovR) * camera.aspect);
+    z0 = Math.min(distH, distW) * 0.97;
     camera.position.set(0, 0, z0);
     camera.lookAt(0, 0, 0);
     if (blobShadow) {
