@@ -193,3 +193,26 @@ body {
 .replay.is-disabled { pointer-events: none; }
 .replay:hover { color: #493f44; }
 .replay:focus-visible { outline: 2px solid #8e6e79; outline-offset: 2px; }
+
+/* Start cues: sound first, then the opening action. */
+.start-cues { position: absolute; left: 0; right: 0; bottom: 9%; height: 76px; }
+.start-cues .tap-hint { bottom: 0; }
+.sound-hint {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  font-size: 11px; font-weight: 400; color: #62565c;
+  background: rgba(255,253,250,.88); padding: 5px 9px; border-radius: 6px;
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
+.sound-hint svg { width: 13px; height: 13px; flex: none; }
+.taplayer.is-poster .sound-hint {
+  visibility: visible; animation: soundHintIn .7s cubic-bezier(.22,1,.36,1) .8s both;
+}
+.taplayer.is-poster .tap-hint {
+  animation: hintFloat 2.6s ease-in-out 2.2s infinite, openingHintIn .7s cubic-bezier(.22,1,.36,1) 1.5s both;
+}
+@keyframes soundHintIn {
+  from { opacity: 0; transform: translate(-50%,6px); }
+  to { opacity: 1; transform: translate(-50%,0); }
+}
+@keyframes openingHintIn { from { opacity: 0; } to { opacity: 1; } }
