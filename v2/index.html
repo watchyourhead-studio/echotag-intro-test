@@ -6,16 +6,16 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a0f14">
 <title>Intro V2 Test</title>
-<link rel="stylesheet" href="3-style.css?v=14">
+<link rel="stylesheet" href="3-style.css?v=15">
 </head>
 <body>
 <div class="root">
   <div class="stage" id="stage">
-    <img src="5-poster.jpg" alt="" class="media poster-img" draggable="false">
     <div class="bg" id="bg"></div>
     <div class="scrim" id="scrim"></div>
         <div class="veil" id="veil"></div>
     <video id="video" src="1-8-intro.mp4" class="media" playsinline webkit-playsinline="true" preload="auto"></video>
+    <video id="videoRev" src="1-intro-rev.mp4" class="media" playsinline webkit-playsinline="true" preload="none" muted></video>
     <div class="taplayer" id="taplayer" role="button" aria-label="Video starten">
       <div class="tap-hint" id="hint">Tippen zum Öffnen</div>
       <span class="testbadge">TEST</span>
@@ -44,12 +44,12 @@
           </div>
           <div class="times"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
         </div>
-        <button type="button" class="replay anim-item" data-i="3" id="replayBtn">Intro erneut ansehen</button>
+        <button type="button" class="replay anim-item" data-i="3" id="replayBtn">Karte zuklappen</button>
       </div>
     </div>
   </div>
   <audio id="audio" src="7-testton.mp3" preload="auto"></audio>
 </div>
-<script src="4-app.js?v=14"></script>
+<script src="4-app.js?v=15"></script>
 </body>
 </html>
