@@ -227,16 +227,11 @@
     ctx.globalAlpha = 1;
     roundCorners(ctx, cv.width, cv.height);   // Ecken wie echte Grusskarte (Max 14:13)
 
-    // Druck in vier Schritten (v2-Mechanik): der Falz trifft keinen Buchstaben.
-    // Geschlossen (Schritt 0) liegt der Text durchgehend mittig; sobald der
-    // physische Spalt aufgeht, rueckt der Buchstabe am Falz schrittweise als
-    // Ganzes auf seine Mehrheitsseite - nie zerrissen, nie doppelt.
-    var steps = [], FR = [0, 1 / 3, 2 / 3, 1], dMax = 0;
-    for (var si = 0; si < FR.length; si++) {
-      var st = bakeTextLayer(img, name, FR[si]);
-      steps.push(st.cv); dMax = st.dMax;
-    }
-    return { art: cv, textSteps: steps, textDMax: dMax };
+    // Druck als eine durchgehende Ebene (Max 14:20: "ganz normal am Stueck"):
+    // kein Versetzen, keine Luecke, kein Crossfade. Die Ebene wird exakt am
+    // Falz geschnitten - wie echter Druck auf einer echten Klappkarte.
+    var tl = bakeTextLayer(img, name, 0);
+    return { art: cv, textSteps: [tl.cv], textDMax: 0 };
   }
 
   // Buchstaben-Layout: optional rueckt der Buchstabe, den der Falz schneiden
@@ -393,7 +388,7 @@
   // ============================================================
   //  3D-Gatefold
   // ============================================================
-  var renderer = null, scene, camera, cardGroup, pivL, pivR, blobShadow, textMats, shadowL, shadowR;
+  var renderer = null, scene, camera, cardGroup, pivL, pivR, blobShadow, textMats, shadowL, shadowR, crease;
   var halfW, cardH = 3.3, z0 = 8;
   var rafId = null, lastFrame = 0;
   var swayOn = true, swayT = 0;
@@ -580,6 +575,29 @@
     shadowR = makeShadow(true);
     cardGroup.add(shadowL); cardGroup.add(shadowR);
 
+    // Falzmitte dunkel wie in der v2-Referenz (dort ist der Spalt von Anfang an
+    // dunkles Karteninneres): schmales Band genau auf der Falzlinie, fade-in mit
+    // den ersten Graden, fade-out sobald die Szene durch den Spalt sichtbar wird
+    function makeCrease() {
+      var c = document.createElement('canvas');
+      c.width = 128; c.height = 8;
+      var x = c.getContext('2d');
+      var gr = x.createLinearGradient(0, 0, 128, 0);
+      gr.addColorStop(0, 'rgba(30,20,14,0)');
+      gr.addColorStop(0.5, 'rgba(30,20,14,1)');
+      gr.addColorStop(1, 'rgba(30,20,14,0)');
+      x.fillStyle = gr; x.fillRect(0, 0, 128, 8);
+      var t = new THREE.CanvasTexture(c);
+      t.encoding = THREE.sRGBEncoding;
+      return new THREE.Mesh(
+        new THREE.PlaneGeometry(halfW * 0.7, cardH * 1.12),
+        new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0, side: THREE.DoubleSide })
+      );
+    }
+    crease = makeCrease();
+    crease.position.z = -0.3;
+    cardGroup.add(crease);
+
 
     window.addEventListener('resize', fit);
     fit();
@@ -635,13 +653,9 @@
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
       // v3: Welt blendet synchron zur Oeffnung ein
       sceneImg.style.opacity = smooth(p * 2.2);
-      // Druck folgt dem physischen Spalt: der Falz-Buchstabe rueckt in vier
-      // Schritten als Ganzes beiseite (max. halber Schritt Versatz ~2-3px)
-      if (textMats && textMats.dWorld > 0) {
-        var gapW = 2 * halfW * (1 - Math.cos(theta));
-        var fr = clamp(gapW / textMats.dWorld, 0, 1);
-        var stp = Math.min(3, Math.floor(fr * 3 + 0.15));  // spaet schalten: Riss bleibt immer schmaler als der dunkle Spalt
-        if (stp !== textMats.step) { textMats.step = stp; textMats.mat.map = textMats.tex[stp]; }
+      // Falzmitte: dunkle Rille ab den ersten Graden, weg sobald die Szene durchkommt
+      if (crease) {
+        crease.material.opacity = 0.9 * smooth((p - 0.02) / 0.08) * (p > 0.3 ? Math.max(0, 1 - (p - 0.3) / 0.25) : 1);
       }
       // Seitenschatten folgen den Innenkanten (Pivot fest, Kante aus Rotation)
       if (shadowL) {
@@ -1135,6 +1149,7 @@
       frozenP = null;
       pivL.rotation.y = 0; pivR.rotation.y = 0;
       if (textMats) { textMats.step = 0; textMats.mat.map = textMats.tex[0]; }
+      if (crease) crease.material.opacity = 0;
       if (shadowL) { shadowL.material.opacity = 0; shadowR.material.opacity = 0; }
       glCanvas.style.filter = '';
       camera.position.set(0, 0, z0);
