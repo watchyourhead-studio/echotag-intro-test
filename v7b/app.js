@@ -68,6 +68,31 @@
   }
   function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
   function clearLater() { timers.forEach(clearTimeout); timers = []; }
+
+  // ---------- Laden: Knopf erst, wenn Bilder und Musik bereit sind ----------
+  var load = { total: 0, done: 0, shown: 0, armed: false, ready: false };
+  var startCues = document.querySelector('.start-cues');
+  var loadRect = document.getElementById('loadRect');
+  function trackLoad(weight) {
+    var once = false;
+    load.total += weight;
+    return function () { if (once) return; once = true; load.done += weight; checkReady(); };
+  }
+  function checkReady() {
+    if (!load.ready && load.armed && load.done >= load.total - 1e-6) setReady();
+  }
+  function setReady() {
+    load.ready = true;
+    startCues.classList.add('is-ready');
+  }
+  function drawLoad(dt) {
+    if (load.ready && load.shown >= .999) return;
+    var target = load.ready ? 1 : (load.total ? load.done / load.total : 0);
+    load.shown += (target - load.shown) * Math.min(1, dt * .006);
+    loadRect.setAttribute('width', String(load.shown * 165));
+  }
+  // Notbremse bei sehr langsamem Netz: nach 15 s trotzdem oeffnen lassen
+  setTimeout(function () { if (!load.ready) setReady(); }, 15000);
   // Zeitpunkt, an dem ein ge-easter Verlauf 0 -> 'to' den Wert 'level' erreicht
   function easeTime(level, ms, to) {
     var lo = 0, hi = 1, x = Math.min(1, level / to);
@@ -152,6 +177,8 @@
 
   function texture(unit, src, done) {
     var img = new Image();
+    var tick = trackLoad(1);
+    img.onerror = tick;
     img.onload = function () {
       var t = gl.createTexture();
       gl.activeTexture(gl.TEXTURE0 + unit);
@@ -162,6 +189,7 @@
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
       done();
+      tick();
     };
     img.src = src;
   }
@@ -300,6 +328,7 @@
     fx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
     drawSparkle(dt);
     drawSnow(dt);
+    drawLoad(dt);
     requestAnimationFrame(frame);
   }
   window.addEventListener('resize', resize);
@@ -319,16 +348,20 @@
     ['music', 'atmo', 'sfx'].forEach(function (k) { bus[k] = actx.createGain(); bus[k].gain.value = 0; bus[k].connect(bus.master); });
     bus.sfx.gain.value = 1;
     ['musik', 'atmo', 'klick', 'kette', 'turm'].forEach(function (n) {
+      var tick = trackLoad(n === 'musik' ? 4 : n === 'atmo' ? .6 : .2);
       fetch('audio/' + n + '.mp3').then(function (r) { return r.arrayBuffer(); }).then(function (data) {
         // Safari kennt nur die Callback-Form
         actx.decodeAudioData(data, function (b) {
           buffers[n] = b;
           // Wer schneller getippt hat, als die Musik geladen war, bekommt sie jetzt
           if (wantAmbience && (n === 'musik' || n === 'atmo') && !loops[n]) startAmbience();
-        }, function () {});
-      }).catch(function () {});
+          tick();
+        }, tick);
+      }).catch(tick);
     });
   }
+  load.armed = true;
+  checkReady();
   function ramp(node, to, sec) {
     if (!actx) return;
     var t = actx.currentTime;
@@ -442,16 +475,23 @@
   }
 
   function unlockVoice() {
-    // Im selben Tap entsperren (iOS), ohne hoerbar zu werden
+    // Im selben Tap fuer iOS freischalten: stumm anspielen und sofort wieder anhalten.
+    // Stumm bleibt sie, bis playVoice() sie wirklich startet - so ist Helene nie zu frueh zu hoeren.
     try {
       voice.muted = true;
       var p = voice.play();
-      if (p && p.then) p.then(function () { voice.pause(); voice.currentTime = 0; voice.muted = false; }, function () { voice.muted = false; });
-    } catch (e) { voice.muted = false; }
+      if (p && p.catch) p.catch(function () {});
+      voice.pause();
+    } catch (e) {}
+  }
+  function playVoice() {
+    voice.muted = false;
+    var p = voice.play();
+    if (p && p.catch) p.catch(function () {});
   }
 
   function open() {
-    if (phase !== 'day' || taplayer.classList.contains('is-hidden')) return;
+    if (phase !== 'day' || taplayer.classList.contains('is-hidden') || !load.ready) return;
     taplayer.classList.add('is-hidden');
     unlockVoice();
     if (actx) { actx.resume(); startAmbience(); }
@@ -468,7 +508,7 @@
       dayNight.hidden = false;
       dayNight.classList.add('is-visible');
     }, T.cardAt);
-    later(function () { voice.currentTime = 0; voice.play().catch(function () {}); }, T.voiceAt);
+    later(function () { voice.currentTime = 0; playVoice(); }, T.voiceAt);
   }
 
   function replay() {
@@ -514,7 +554,7 @@
     fill.style.visibility = pct > .5 ? 'visible' : 'hidden';
   }
   playBtn.addEventListener('click', function () {
-    if (voice.paused) voice.play().catch(function () {}); else voice.pause();
+    if (voice.paused) playVoice(); else voice.pause();
   });
   voice.addEventListener('play', function () {
     if (voice.muted) return;   // stiller Entsperr-Start

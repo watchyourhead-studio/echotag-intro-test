@@ -184,3 +184,20 @@ body {
 }
 .stage.is-day .replay { color: rgba(34, 48, 110, .6); }
 .stage.is-day .gift { color: #7C1D25; border-bottom-color: rgba(124, 29, 37, .4); }
+
+/* --- Ladezustand: eine Tuschelinie waechst, bis Bilder und Musik bereit sind --- */
+.cta { display: grid; place-items: center; }
+.cta > * { grid-area: 1 / 1; }
+.loading {
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  pointer-events: none;
+  opacity: 0; animation: loadIn .5s ease .35s forwards;   /* erscheint nur, wenn es dauert */
+}
+@keyframes loadIn { to { opacity: 1; } }
+.loading-text { font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; color: rgba(124, 29, 37, .72); }
+.loading svg { width: 150px; height: 8px; overflow: visible; }
+.ll-base { fill: none; stroke: #2B2A33; stroke-width: 1; opacity: .16; vector-effect: non-scaling-stroke; filter: url(#ink); }
+.ll-ink { fill: none; stroke: #2B2A33; stroke-width: 1.5; opacity: .8; stroke-linecap: round; vector-effect: non-scaling-stroke; filter: url(#ink); }
+#hint { transition: opacity .7s ease; }
+.start-cues:not(.is-ready) #hint { opacity: 0; animation: none; pointer-events: none; }
+.start-cues.is-ready .loading { animation: none; opacity: 0; transition: opacity .4s ease; }
