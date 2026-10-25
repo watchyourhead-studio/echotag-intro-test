@@ -17,7 +17,7 @@
   var SCENE_MS = 6000;    // Dauer der Zeichen-Flugphase bis die Player-Karte einfliegt
   var STROKE_DUR = 0.15;  // Anteil: Strich-Phase pro Ebene
   var COLOR_DUR = 0.20;   // Anteil: Farb-Phase pro Ebene
-  var CAM_Z = 320;        // Kamera-Dolly in px (Perspektive 1000)
+  var CAM_Z = 80;         // Kamera-Dolly in px (Perspektive 1000), bewusst leicht
   var OPEN_ANGLE = 2.96;  // ~170 Grad
   var CARD_W = 905, CARD_H = 1600;
   var THICK = 0.055;      // Materialstaerke der Karte (dicke Kartonage)
