@@ -227,45 +227,48 @@
     ctx.globalAlpha = 1;
     roundCorners(ctx, cv.width, cv.height);   // Ecken wie echte Grusskarte (Max 14:13)
 
-    // Druck als zwei getrennte Ebenen (Max 15:03): "closed" durchgehend mittig,
-    // "open" mit dem Falz in einer Buchstabenluecke (v2-Mechanik: der Falz trifft
-    // keinen Buchstaben, jede Haelfte klappt mit ganzen Lettern auf). Der Morph
-    // laeuft in den ersten ~250ms der Oeffnung, geschlossen steht immer die
-    // saubere Durchgehend-Version.
-    return { art: cv, textClosed: bakeTextLayer(img, name, false), textOpen: bakeTextLayer(img, name, true) };
+    // Druck in vier Schritten (v2-Mechanik): der Falz trifft keinen Buchstaben.
+    // Geschlossen (Schritt 0) liegt der Text durchgehend mittig; sobald der
+    // physische Spalt aufgeht, rueckt der Buchstabe am Falz schrittweise als
+    // Ganzes auf seine Mehrheitsseite - nie zerrissen, nie doppelt.
+    var steps = [], FR = [0, 1 / 3, 2 / 3, 1], dMax = 0;
+    for (var si = 0; si < FR.length; si++) {
+      var st = bakeTextLayer(img, name, FR[si]);
+      steps.push(st.cv); dMax = st.dMax;
+    }
+    return { art: cv, textSteps: steps, textDMax: dMax };
   }
 
   // Buchstaben-Layout: optional rueckt der Buchstabe, den der Falz schneiden
   // wuerde, komplett auf die Seite, auf der sein Zentrum liegt; alle Buchstaben
   // auf dieser Seite ruecken mit. Kein zerrissener Buchstabe, nur ein schmaler
   // Zwischenraum genau am Falz.
-  function layoutText(ctx, text, cx, spacing, forOpen, foldX, margin) {
+  function layoutText(ctx, text, cx, spacing, foldX, margin, frac) {
     var chars = text.split('');
     var ws = chars.map(function (ch) { return ctx.measureText(ch).width; });
     var total = ws.reduce(function (a, b) { return a + b; }, 0) + spacing * (chars.length - 1);
     var x = cx - total / 2, pos = [], i, j;
     for (i = 0; i < chars.length; i++) { pos.push({ ch: chars[i], x: x, w: ws[i] }); x += ws[i] + spacing; }
-    if (forOpen) {
-      for (i = 0; i < pos.length; i++) {
-        var g = pos[i];
-        if (foldX > g.x + 0.5 && foldX < g.x + g.w - 0.5) {
-          if (g.x + g.w / 2 <= foldX) {
-            var dL = (g.x + g.w) - (foldX - margin);
-            for (j = 0; j <= i; j++) pos[j].x -= dL;
-          } else {
-            var dR = (foldX + margin) - g.x;
-            for (j = i; j < pos.length; j++) pos[j].x += dR;
-          }
-          break;
+    var d = 0;
+    for (i = 0; i < pos.length; i++) {
+      var g = pos[i];
+      if (foldX > g.x + 0.5 && foldX < g.x + g.w - 0.5) {
+        if (g.x + g.w / 2 <= foldX) {
+          d = (g.x + g.w) - (foldX - margin);
+          for (j = 0; j <= i; j++) pos[j].x -= d * frac;
+        } else {
+          d = (foldX + margin) - g.x;
+          for (j = i; j < pos.length; j++) pos[j].x += d * frac;
         }
+        break;
       }
     }
-    return pos;
+    return { pos: pos, d: d };
   }
 
   // Druckebene (transparent, nur Text) mit dem v3-Print-Finish: Weinrot,
   // Artwork weich in die Buchstaben gemischt, auf Textform geschnitten.
-  function bakeTextLayer(img, name, forOpen) {
+  function bakeTextLayer(img, name, frac) {
     var S = 2;
     var foldX = CARD_W * S / 2;
     var tCv = document.createElement('canvas');
@@ -282,8 +285,10 @@
     var maxW = tCv.width * 0.78;
 
     var items = [];
+    var dMax = 0, ly;
     tCtx.font = '500 ' + fuerSize + 'px Jost';
-    items.push({ font: tCtx.font, pos: layoutText(tCtx, 'FÜR', foldX, fuerSpacing, forOpen, foldX, 8 * S), y: 738 * S });
+    ly = layoutText(tCtx, 'FÜR', foldX, fuerSpacing, foldX, 5 * S, frac);
+    items.push({ font: tCtx.font, pos: ly.pos, y: 738 * S }); dMax = Math.max(dMax, ly.d);
     tCtx.font = '600 ' + size + 'px Jost';
     var probe = label.split('').map(function (ch) { return tCtx.measureText(ch).width; });
     var probeTotal = probe.reduce(function (a, b) { return a + b; }, 0);
@@ -293,9 +298,11 @@
       probe = label.split('').map(function (ch) { return tCtx.measureText(ch).width; });
       probeTotal = probe.reduce(function (a, b) { return a + b; }, 0);
     }
-    items.push({ font: tCtx.font, pos: layoutText(tCtx, label, foldX, 0, forOpen, foldX, 10 * S), y: 847 * S });
+    ly = layoutText(tCtx, label, foldX, 0, foldX, 6 * S, frac);
+    items.push({ font: tCtx.font, pos: ly.pos, y: 847 * S }); dMax = Math.max(dMax, ly.d);
     tCtx.font = '500 ' + etSize + 'px Jost';
-    items.push({ font: tCtx.font, pos: layoutText(tCtx, 'ECHOTAG', foldX, etSpacing, forOpen, foldX, 6 * S), y: 1536 * S });
+    ly = layoutText(tCtx, 'ECHOTAG', foldX, etSpacing, foldX, 4 * S, frac);
+    items.push({ font: tCtx.font, pos: ly.pos, y: 1536 * S }); dMax = Math.max(dMax, ly.d);
 
     items.forEach(function (it) {
       tCtx.font = it.font;
@@ -320,7 +327,7 @@
     tCtx.globalCompositeOperation = 'destination-in';
     tCtx.drawImage(mCv, 0, 0);
     tCtx.globalCompositeOperation = 'source-over';
-    return tCv;
+    return { cv: tCv, dMax: dMax };
   }
 
   // Innenseiten: Creme-Papier, Artwork-Korn scheint durch (v3-Mechanik, EchoTag-Creme)
@@ -461,14 +468,16 @@
 
     // Druck-Overlays (closed/open) als eigene Ebenen ueber dem Artwork
     textMats = null;
-    if (front.textClosed && front.textOpen) {
-      var tcx = new THREE.CanvasTexture(front.textClosed);
-      tcx.encoding = THREE.sRGBEncoding; tcx.anisotropy = 4;
-      var tox = new THREE.CanvasTexture(front.textOpen);
-      tox.encoding = THREE.sRGBEncoding; tox.anisotropy = 4;
+    if (front.textSteps && front.textSteps.length) {
+      var texs = front.textSteps.map(function (c) {
+        var t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding; t.anisotropy = 4;
+        return t;
+      });
       textMats = {
-        closed: new THREE.MeshStandardMaterial({ map: tcx, transparent: true, depthWrite: false, roughness: 0.95, metalness: 0 }),
-        open: new THREE.MeshStandardMaterial({ map: tox, transparent: true, depthWrite: false, opacity: 0, roughness: 0.95, metalness: 0 })
+        tex: texs, step: 0,
+        dWorld: (front.textDMax || 0) / (CARD_W * 2) * (2 * halfW),
+        mat: new THREE.MeshStandardMaterial({ map: texs[0], transparent: true, depthWrite: false, roughness: 0.95, metalness: 0 })
       };
     }
 
@@ -529,22 +538,15 @@
       gbo.translate(xOff, -cardH / 2, -THICK / 2);
       pivot.add(new THREE.Mesh(gbo, L ? mBotL : mBotR));
 
-      // Druck-Overlays auf der Vorderseite (gleiche UV-Haelfte wie der Fluegel)
+      // Druck-Overlay auf der Vorderseite (gleiche UV-Haelfte wie der Fluegel)
       if (textMats) {
         var gtA = new THREE.PlaneGeometry(halfW, cardH);
         var uvA = gtA.attributes.uv;
         for (i = 0; i < uvA.count; i++) uvA.setX(i, L ? uvA.getX(i) * 0.5 : 0.5 + uvA.getX(i) * 0.5);
         gtA.translate(xOff, 0, 0.002);
-        var mA = new THREE.Mesh(gtA, textMats.closed);
+        var mA = new THREE.Mesh(gtA, textMats.mat);
         mA.renderOrder = 1;
         pivot.add(mA);
-        var gtB = new THREE.PlaneGeometry(halfW, cardH);
-        var uvB = gtB.attributes.uv;
-        for (i = 0; i < uvB.count; i++) uvB.setX(i, L ? uvB.getX(i) * 0.5 : 0.5 + uvB.getX(i) * 0.5);
-        gtB.translate(xOff, 0, 0.004);
-        var mB = new THREE.Mesh(gtB, textMats.open);
-        mB.renderOrder = 2;
-        pivot.add(mB);
       }
 
       return pivot;
@@ -633,11 +635,13 @@
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
       // v3: Welt blendet synchron zur Oeffnung ein
       sceneImg.style.opacity = smooth(p * 2.2);
-      // Druck-Morph closed -> open (Falz-Luecke), unsichtbar in der ersten Bewegung
-      if (textMats) {
-        var tk = smooth((p - 0.04) / 0.1);
-        textMats.closed.opacity = 1 - tk;
-        textMats.open.opacity = tk;
+      // Druck folgt dem physischen Spalt: der Falz-Buchstabe rueckt in vier
+      // Schritten als Ganzes beiseite (max. halber Schritt Versatz ~2-3px)
+      if (textMats && textMats.dWorld > 0) {
+        var gapW = 2 * halfW * (1 - Math.cos(theta));
+        var fr = clamp(gapW / textMats.dWorld, 0, 1);
+        var stp = Math.min(3, Math.floor(fr * 3 + 0.5));
+        if (stp !== textMats.step) { textMats.step = stp; textMats.mat.map = textMats.tex[stp]; }
       }
       // Seitenschatten folgen den Innenkanten (Pivot fest, Kante aus Rotation)
       if (shadowL) {
@@ -1130,7 +1134,7 @@
     if (renderer) {
       frozenP = null;
       pivL.rotation.y = 0; pivR.rotation.y = 0;
-      if (textMats) { textMats.closed.opacity = 1; textMats.open.opacity = 0; }
+      if (textMats) { textMats.step = 0; textMats.mat.map = textMats.tex[0]; }
       if (shadowL) { shadowL.material.opacity = 0; shadowR.material.opacity = 0; }
       glCanvas.style.filter = '';
       camera.position.set(0, 0, z0);
