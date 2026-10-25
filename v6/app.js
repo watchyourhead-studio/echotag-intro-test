@@ -426,9 +426,9 @@
     }
     var FCW = frontCanvas.width, FCH = frontCanvas.height, FH = FCW / 2;
     var EW = 14; // Quellstreifenbreite im Front-Canvas (v3)
-    var mInL = edgeMat(edgeStrip(frontCanvas, FH - EW, 0, EW, FCH, 64, 1600, 'rgb(172,164,152)'));
+    var mInL = edgeMat(edgeStrip(frontCanvas, FH - EW, 0, EW, FCH, 64, 1600, 'rgb(202,194,180)'));
     var mOutL = edgeMat(edgeStrip(frontCanvas, 0, 0, EW, FCH, 64, 1600));
-    var mInR = edgeMat(edgeStrip(frontCanvas, FH, 0, EW, FCH, 64, 1600, 'rgb(172,164,152)'));
+    var mInR = edgeMat(edgeStrip(frontCanvas, FH, 0, EW, FCH, 64, 1600, 'rgb(202,194,180)'));
     var mOutR = edgeMat(edgeStrip(frontCanvas, FCW - EW, 0, EW, FCH, 64, 1600));
     var mTopL = edgeMat(edgeStrip(frontCanvas, 0, 0, FH, EW, 800, 64));
     var mBotL = edgeMat(edgeStrip(frontCanvas, 0, FCH - EW, FH, EW, 800, 64));
