@@ -14,14 +14,24 @@
   };
 
   // ---------- Konstanten ----------
-  // ---------- Oeffnungs-Choreografie (frameweise aus v2 vermessen) ----------
-  // v3-Oeffnung (Max 09:25: v3 war "fast perfekt") mit genau drei Anpassungen:
-  // a) insgesamt +20% langsamer, b) 350ms v2-Hold vor dem Start,
-  // c) Fluegel-Desync im v2-Verhaeltnis (1050/1650) aufs v3-Tempo skaliert.
-  var HOLD_MS = 350;      // b) Anticipation: Karte steht nach dem Tap kurz still
-  var SWING_L_MS = 1075;  // c) linker Fluegel = 1690 * 1050/1650
-  var SWING_R_MS = 1690;  // a+c) rechter hinkt hinterher; 350+1690 = 2040ms = v3 (1700ms) +20%
-  var OPEN_TOTAL = HOLD_MS + SWING_R_MS;
+  // ---------- Oeffnung, live ueber das Panel aenderbar ----------
+  // Etwas langsamer als die letzte Film-Messung. Tempo 1 benutzt diese Millisekunden.
+  var TUNE = {
+    hold: 220,
+    left: 2200,
+    right: 2320,
+    tempo: 0.7,
+    angle: 170,
+    camStart: 0,
+    camPush: 0,
+    sceneAt: 0
+  };
+  function tuneScale() { return Math.max(0.25, TUNE.tempo); }
+  function holdMs() { return TUNE.hold / tuneScale(); }
+  function swingL() { return TUNE.left / tuneScale(); }
+  function swingR() { return TUNE.right / tuneScale(); }
+  function openTotal() { return holdMs() + swingR(); }
+  function openAngle() { return TUNE.angle * Math.PI / 180; }
   // ---------- FLUG-VIDEO (Asset-Slot) ----------
   // Max' KI-Flugvideo kommt als 2-flug.mp4 in diesen Ordner - nur Datei tauschen, kein Code-Eingriff.
   // Solange es fehlt, laeuft das Paris-Standbild (scene.jpg) als Platzhalter.
@@ -38,7 +48,7 @@
   };
   var OPEN_ANGLE = 2.96;  // ~170 Grad
   var CARD_W = 905, CARD_H = 1600;
-  var THICK = 0.055;      // Materialstaerke der Karte (v3-Wert, von Max abgenommen; ~3% der Breite wie der Blender-Render)
+  var THICK = 0.030;      // schmale Kante wie im V2-Film, kein dicker weisser Kern
   var SCENE_BLUR0 = 7;    // Rack-Focus: Welt startet so unscharf, Oeffnung zieht den Fokus nach hinten
 
   // ---------- URL-Parameter ----------
@@ -115,7 +125,7 @@
       return by(t);
     };
   }
-  function openEase(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }  // v3: easeInOutCubic
+  var openEase = cubicBezier(0.40, 0.30, 0.80, 0.75);
   function smooth(x) { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
 
   function setHint(text, loading) {
@@ -124,7 +134,8 @@
   }
 
   // ============================================================
-  //  Texturen: Motiv + Farben aus CONFIG, Name zur Laufzeit eingebrannt
+  //  Texturen: Karton. Farbe aus CONFIG, Faser von der V2-Karte,
+  //  Falz wie dort vermessen. Der Empfaengername bleibt Live-Ebene.
   // ============================================================
   function loadImage(src) {
     return new Promise(function (res, rej) {
@@ -142,6 +153,9 @@
 
   // Gleichmaessiges Papierkorn, damit gebackener Text wie Druck wirkt
   var grainPat = null;
+  var paperTile = null; // Graustufen-Faser aus der fotografierten V2-Karte
+  var creasePx = null, creaseW = 0, creaseH = 0;
+  var CREASE_DX0 = -16; // Pixel 0 der Falz-Karte = 16px links der Rinne (an card-front gemessen)
   function makeGrain(ctx) {
     var g = document.createElement('canvas');
     g.width = 128; g.height = 128;
@@ -198,39 +212,138 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  // Blender-Asset-Variante: gebackene Papier-Textur (Korn+Mottling) aus dem
-  // Render-Projekt; runde Ecken wie gehabt per Maske. Kein Empfaengername drin.
-  function bakeFrontImg(im) {
-    var cv = document.createElement('canvas');
-    cv.width = im.naturalWidth; cv.height = im.naturalHeight;
-    var ctx = cv.getContext('2d');
-    ctx.drawImage(im, 0, 0);
-    bakeCreaseAO(ctx, cv.width, cv.height, 0.20);
-    roundCorners(ctx, cv.width, cv.height);
-    return cv;
+  // Faser 1:1 zur fotografierten Karte: die Kachel stammt pixelgleich aus card-front.
+  function coverGrain(ctx, w, h, alpha) {
+    ctx.save();
+    if (paperTile) {
+      ctx.globalAlpha = alpha;
+      ctx.globalCompositeOperation = 'overlay';
+      var s = w / CARD_W;
+      var dw = paperTile.width * s;
+      var dh = paperTile.height * s;
+      for (var y = 0; y < h; y += dh) {
+        for (var x = 0; x < w; x += dw) ctx.drawImage(paperTile, x, y, dw, dh);
+      }
+    } else {
+      if (!grainPat) makeGrain(ctx);
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = grainPat;
+      ctx.fillRect(0, 0, w, h);
+    }
+    ctx.restore();
   }
 
-  // Mittelknick: weiche Schattentalka beidseitig des Falzes + feine Lichtkante.
-  // View-unabhaengig gebacken, damit der Knick im geschlossenen Zustand sicher liest.
-  function bakeCreaseAO(ctx, w, h, strength) {
-    var cx = w / 2, gw = w * 0.028;
-    var gL = ctx.createLinearGradient(cx - gw, 0, cx, 0);
-    gL.addColorStop(0, 'rgba(0,0,0,0)');
-    gL.addColorStop(1, 'rgba(24,10,12,' + strength + ')');
-    ctx.fillStyle = gL;
-    ctx.fillRect(cx - gw, 0, gw, h);
-    var gR = ctx.createLinearGradient(cx, 0, cx + gw, 0);
-    gR.addColorStop(0, 'rgba(24,10,12,' + strength + ')');
-    gR.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = gR;
-    ctx.fillRect(cx, 0, gw, h);
-    ctx.fillStyle = 'rgba(255,250,238,' + (strength * 0.45).toFixed(3) + ')';
-    ctx.fillRect(cx - Math.max(1, w * 0.0008), 0, Math.max(2, w * 0.0016), h);
+  // Ganz leichter Randabfall wie bei einem Foto von Karton, kein Verlaufs-Panel.
+  function softenEdges(ctx, w, h, amount) {
+    var g = ctx.createRadialGradient(w * 0.5, h * 0.46, w * 0.2, w * 0.5, h * 0.5, h * 0.76);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.78, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(30,8,12,' + amount + ')');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
   }
 
-  // Vorderseite: NUR eine Farbe, kein Motiv, kein eingebrannter Name.
-  // Der Empfaengername ist eine Live-Textebene im DOM (Jost), damit dasselbe
-  // Material fuer alle Empfaenger funktioniert.
+  // Buchdruck: Farbe sitzt im Papier, mit kleinem Licht- und Schattenversatz.
+  function letterpress(ctx, text, cx, y, size, spacing) {
+    ctx.save();
+    ctx.font = '500 ' + size + 'px Jost';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = 'rgba(42, 10, 14, 0.5)';
+    drawSpaced(ctx, text, cx + size * 0.012, y + size * 0.016, spacing);
+    ctx.fillStyle = 'rgba(255, 236, 220, 0.32)';
+    drawSpaced(ctx, text, cx - size * 0.008, y - size * 0.012, spacing);
+    ctx.fillStyle = 'rgba(246, 241, 232, 0.94)';
+    drawSpaced(ctx, text, cx, y, spacing);
+    ctx.restore();
+  }
+
+  // Falzstreifen aus dem V2-Foto: duenne, ausgefranste Rinne, kein gerader Verlauf.
+  function captureCrease(img) {
+    var c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    var x = c.getContext('2d');
+    x.drawImage(img, 0, 0);
+    var id = x.getImageData(0, 0, c.width, c.height);
+    creasePx = id.data;
+    creaseW = c.width;
+    creaseH = c.height;
+  }
+
+  function creaseFactor(dx, sy) {
+    var sx = Math.round(dx - CREASE_DX0);
+    if (sx < 0 || sx >= creaseW) return 1;
+    sy = sy < 0 ? 0 : (sy > creaseH - 1 ? creaseH - 1 : sy);
+    return creasePx[(sy * creaseW + sx) * 4] / 128;
+  }
+
+  // Uebernimmt die gemessene Schattierung Zeile fuer Zeile, inklusive der kleinen Ausfransung.
+  function shadeStock(ctx, w, h, strength) {
+    if (!creasePx) return;
+    var img = ctx.getImageData(0, 0, w, h);
+    var d = img.data;
+    var scale = w / CARD_W;
+    var cx = (w - 1) / 2;
+    var reach = (creaseW + 2) * scale;
+    var x0 = Math.max(0, Math.floor(cx - reach));
+    var x1 = Math.min(w - 1, Math.ceil(cx + reach));
+    for (var y = 0; y < h; y++) {
+      var sy = Math.min(creaseH - 1, Math.floor(y * creaseH / h));
+      var row = y * w;
+      for (var x = x0; x <= x1; x++) {
+        var raw = creaseFactor((x - cx) / scale, sy);
+        var factor = 1 + (raw - 1) * strength;
+        if (factor > 1) factor = 1 + (factor - 1) * 0.28;
+        var i = (row + x) * 4;
+        d[i] = Math.min(255, d[i] * factor);
+        d[i + 1] = Math.min(255, d[i + 1] * factor);
+        d[i + 2] = Math.min(255, d[i + 2] * factor);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  // Normalmap aus derselben unregelmaessigen Rinne, nur ganz leicht,
+  // damit das Licht den Knick nicht zu einer perfekten Fase macht.
+  function makeFrontNormal() {
+    var w = 905, h = 1600;
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#8080ff';
+    ctx.fillRect(0, 0, w, h);
+    if (!creasePx) return c;
+    var cx = (w - 1) / 2;
+    var band = 20;
+    var x0 = Math.max(0, Math.floor(cx - band));
+    var x1 = Math.min(w - 1, Math.ceil(cx + band));
+    var sw = x1 - x0 + 1;
+    var out = ctx.createImageData(sw, h);
+    var od = out.data;
+    var bump = 0.85;
+    function heightAt(px, sy) {
+      return 0.5 + (creaseFactor(px - cx, sy) - 1) * 0.5;
+    }
+    for (var y = 0; y < h; y++) {
+      var sy = Math.min(creaseH - 1, Math.floor(y * creaseH / h));
+      var row = y * sw;
+      for (var x = x0; x <= x1; x++) {
+        var ddx = heightAt(x + 1, sy) - heightAt(x - 1, sy);
+        var nx = -ddx * bump;
+        var nz = 1;
+        var len = Math.sqrt(nx * nx + nz * nz);
+        var i = (row + (x - x0)) * 4;
+        od[i] = (nx / len * 0.5 + 0.5) * 255;
+        od[i + 1] = 128;
+        od[i + 2] = (nz / len * 0.5 + 0.5) * 255;
+        od[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(out, x0, 0);
+    return c;
+  }
+
+  // Vorderseite: eine Farbe, echtes Papier, Falz durch die Wortmarke.
+  // Der Empfaengername ist eine Live-Textebene (Jost) und wird nicht eingebrannt.
   function bakeFront() {
     var S = 2;
     var cv = document.createElement('canvas');
@@ -238,82 +351,118 @@
     var ctx = cv.getContext('2d');
     ctx.fillStyle = COLORS.card;
     ctx.fillRect(0, 0, cv.width, cv.height);
-    // dezenter Verlauf: Mitte etwas heller, Raender vertieft
-    var g = ctx.createRadialGradient(
-      cv.width / 2, cv.height * 0.42, cv.width * 0.1,
-      cv.width / 2, cv.height * 0.5, cv.height * 0.75
-    );
-    g.addColorStop(0, 'rgba(255,235,225,0.10)');
-    g.addColorStop(0.55, 'rgba(0,0,0,0)');
-    g.addColorStop(1, 'rgba(0,0,0,0.28)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    var g2 = ctx.createLinearGradient(0, 0, 0, cv.height);
-    g2.addColorStop(0, 'rgba(0,0,0,0)');
-    g2.addColorStop(1, COLORS.cardDeep);
-    ctx.globalAlpha = 0.35;
-    ctx.fillStyle = g2;
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.globalAlpha = 1;
-    // EchoTag-Wortmarke im Druck, Jost, dezent - dort, wo bei der Vorlage das
-    // Bart-&-Bastian-Logo sass (Mitte, leicht unterhalb der Kartenmitte)
-    ctx.fillStyle = 'rgba(246,241,232,0.92)';
-    ctx.textBaseline = 'alphabetic';
-    ctx.font = '500 ' + (34 * S) + 'px Jost';
-    drawSpaced(ctx, 'ECHOTAG', cv.width / 2, 1010 * S, 16 * S);
-    if (!grainPat) makeGrain(ctx);
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = grainPat;
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.globalAlpha = 1;
-    mottle(ctx, cv.width, cv.height);
+    coverGrain(ctx, cv.width, cv.height, 0.88);
+    softenEdges(ctx, cv.width, cv.height, 0.12);
+    // Wortmarke dort, wo bei der Vorlage das Bart-&-Bastian-Logo sass.
+    // Der Falz wird danach daruebergelegt und teilt den Schriftzug.
+    letterpress(ctx, 'ECHOTAG', cv.width / 2, 1010 * S, 34 * S, 16 * S);
+    shadeStock(ctx, cv.width, cv.height, 1);
     roundCorners(ctx, cv.width, cv.height);
     return cv;
   }
 
-  // Innenseiten: Creme-Papier mit Korn, ohne Aufdruck
+  // Empfaengername: eigene Druckebene, zur Laufzeit aus dem Namen erzeugt.
+  // Liegt auf den Fluegeln, klappt also mit, ist aber nicht Teil der Karten-Textur.
+  function bakeName(label) {
+    var S = 2;
+    var cv = document.createElement('canvas');
+    cv.width = CARD_W * S; cv.height = CARD_H * S;
+    var ctx = cv.getContext('2d');
+    var name = String(label || 'Julia').toUpperCase();
+    var maxW = cv.width * 0.82;
+    var size = Math.round(cv.height * 0.057);
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = '600 ' + size + 'px Jost';
+    while (ctx.measureText(name).width > maxW && size > 28) {
+      size -= 2;
+      ctx.font = '600 ' + size + 'px Jost';
+    }
+    var nameY = Math.round(cv.height * 0.545);
+    ctx.fillStyle = 'rgba(42, 12, 16, 0.4)';
+    ctx.fillText(name, (cv.width - ctx.measureText(name).width) / 2 + size * 0.012, nameY + size * 0.02);
+    ctx.fillStyle = '#f3eee4';
+    ctx.fillText(name, (cv.width - ctx.measureText(name).width) / 2, nameY);
+
+    var fuerSize = Math.round(cv.height * 0.0186);
+    var fuerY = Math.round(cv.height * 0.468);
+    ctx.font = '500 ' + fuerSize + 'px Jost';
+    ctx.fillStyle = 'rgba(42, 12, 16, 0.4)';
+    drawSpaced(ctx, 'FÜR', cv.width / 2 + 1, fuerY + 1, Math.round(fuerSize * 0.45));
+    ctx.fillStyle = '#f3eee4';
+    drawSpaced(ctx, 'FÜR', cv.width / 2, fuerY, Math.round(fuerSize * 0.45));
+
+    if (paperTile) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.globalAlpha = 0.55;
+      var s = cv.width / CARD_W;
+      var dw = paperTile.width * s;
+      var dh = paperTile.height * s;
+      for (var y = 0; y < cv.height; y += dh) {
+        for (var x = 0; x < cv.width; x += dw) ctx.drawImage(paperTile, x, y, dw, dh);
+      }
+      ctx.restore();
+    }
+    imprintCrease(ctx, cv.width, cv.height, 1);
+    return cv;
+  }
+
+  function imprintCrease(ctx, w, h, strength) {
+    if (!creasePx) return;
+    var img = ctx.getImageData(0, 0, w, h);
+    var d = img.data;
+    var scale = w / CARD_W;
+    var cx = (w - 1) / 2;
+    for (var y = 0; y < h; y++) {
+      var sy = Math.min(creaseH - 1, Math.floor(y * creaseH / h));
+      var row = y * w;
+      for (var x = 0; x < w; x++) {
+        var i = (row + x) * 4;
+        if (d[i + 3] < 8) continue;
+        var raw = creaseFactor((x - cx) / scale, sy);
+        var factor = 1 + (raw - 1) * strength;
+        if (factor > 1) factor = 1 + (factor - 1) * 0.28;
+        d[i] = Math.min(255, d[i] * factor);
+        d[i + 1] = Math.min(255, d[i + 1] * factor);
+        d[i + 2] = Math.min(255, d[i + 2] * factor);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
   function bakeBack() {
-    var S = 1;
+    var S = 2;
     var cv = document.createElement('canvas');
     cv.width = CARD_W * S; cv.height = CARD_H * S;
     var ctx = cv.getContext('2d');
     ctx.fillStyle = COLORS.cream;
     ctx.fillRect(0, 0, cv.width, cv.height);
-    if (!grainPat) makeGrain(ctx);
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = grainPat;
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.globalAlpha = 1;
-    mottle(ctx, cv.width, cv.height);
+    coverGrain(ctx, cv.width, cv.height, 0.42);
+    softenEdges(ctx, cv.width, cv.height, 0.07);
+    shadeStock(ctx, cv.width, cv.height, 0.62);
     roundCorners(ctx, cv.width, cv.height);
     return cv;
   }
 
-  // Schnittkante in hellem Papierweiss (Max 09:20): die Kante muss beim
-  // Schwenken als helle Papierschicht lesbar sein, nicht als umgedruckter Rotton.
+  // Schnittkante wie im V2-Film: dieselbe Farbe wie die Front, zur Spalte hin fast schwarz.
+  // Kein heller Kartonkern — dort ist die Kante ein dunkler Schatten der Kartenfarbe.
   function paperEdge(dw, dh, along) {
     var c = document.createElement('canvas');
     c.width = dw; c.height = dh;
     var x = c.getContext('2d');
-    x.fillStyle = '#faf6ec';            // warmes Papierweiss wie Karton-Schnitt
+    var g = along === 'h'
+      ? x.createLinearGradient(0, 0, 0, dh)
+      : x.createLinearGradient(0, 0, dw, 0);
+    g.addColorStop(0, '#5c1a21');
+    g.addColorStop(0.35, '#3c1218');
+    g.addColorStop(1, '#140608');
+    x.fillStyle = g;
     x.fillRect(0, 0, dw, dh);
-    // leichte Schicht-Struktur entlang der Kante (Kartonage-Lagen)
-    x.globalAlpha = 0.12;
-    var ln = along === 'h' ? dw : dh;
-    for (var ly = 0; ly < ln; ly += 3) {
-      x.fillStyle = (ly % 6 === 0) ? '#e6e0d0' : '#fbf8ef';
-      if (along === 'h') x.fillRect(ly, 0, 1, dh); else x.fillRect(0, ly, dw, 1);
-    }
-    x.globalAlpha = 1;
-    x.globalCompositeOperation = 'multiply';
-    x.fillStyle = 'rgb(243,243,243)';   // mattieren wie Schnittkante
-    x.fillRect(0, 0, dw, dh);
-    x.globalCompositeOperation = 'source-over';
-    if (grainPat) {
-      x.globalAlpha = 0.7;
-      x.fillStyle = grainPat;
-      x.fillRect(0, 0, dw, dh);
-      x.globalAlpha = 1;
+    if (paperTile) {
+      x.save();
+      x.globalAlpha = 0.22;
+      x.globalCompositeOperation = 'multiply';
+      x.drawImage(paperTile, 0, 0, dw, dh);
+      x.restore();
     }
     return c;
   }
@@ -327,9 +476,31 @@
   var swayOn = true, swayT = 0;
   var tapTime = 0, swayRotY = 0, swayRotX = 0;
   var openStart = 0, frozenP = null;
-  var ghL = [], ghR = [];   // Nachzieher fuer Bewegungsunschaerfe
+  var nameTex = null;
+  var nameOnCard = false;
+  var printName = null;
+  var ghL = [], ghR = [];
+  // Tiefenschaerfe nur auf der Karte: Fokus = geschlossene Ebene (z=0).
+  // Weiter vorn (Falz) weicher, Aussenkante scharf. Die DOM-Szene bleibt ungefiltert.
+  var dofTarget = null, dofScene = null, dofCam = null, dofUniforms = null;
+  var dofFocus = null, dofSize = null;
+  var DOF_APERTURE = 0.046;
 
-  function initGL(frontCanvas, backCanvas) {
+  // Innenflaeche: Falz (Texturmitte) auf das Scharnier, nicht in die Fluegelmitte.
+  function hingeUV(geo, side) {
+    geo.computeBoundingBox();
+    var pos = geo.attributes.position;
+    var uv = geo.attributes.uv;
+    var minX = geo.boundingBox.min.x;
+    var span = geo.boundingBox.max.x - minX || 1;
+    for (var i = 0; i < uv.count; i++) {
+      var t = (pos.getX(i) - minX) / span;
+      uv.setX(i, side === 'L' ? t * 0.5 : 0.5 + t * 0.5);
+    }
+    uv.needsUpdate = true;
+  }
+
+  function initGL(frontCanvas, backCanvas, normalCanvas, nameCanvas) {
     var ctxTries = 0;
     while (ctxTries < 3) {
       try {
@@ -389,84 +560,32 @@
     backTex.encoding = THREE.sRGBEncoding;
     backTex.anisotropy = 4;
 
-    // Papier-Antwort aufs Licht: feine Faser-Normalen + leicht schwankende Rauheit
-    function makeRoughTex() {
-      var S = 256, cv = document.createElement('canvas');
-      cv.width = S; cv.height = S;
-      var x = cv.getContext('2d');
-      var id = x.createImageData(S, S);
-      for (var i = 0; i < id.data.length; i += 4) {
-        var v = 222 + Math.random() * 24;   // Rauheit ~0.87-0.96
-        id.data[i] = v; id.data[i + 1] = v; id.data[i + 2] = v; id.data[i + 3] = 255;
-      }
-      x.putImageData(id, 0, 0);
-      // grobe Wolken (Papierdichte schwankt flaechenhaft)
-      x.globalAlpha = 0.10;
-      for (var b = 0; b < 9; b++) {
-        var bx = Math.random() * S, by = Math.random() * S, br = 30 + Math.random() * 70;
-        var gr = x.createRadialGradient(bx, by, 0, bx, by, br);
-        var dk = Math.random() < 0.5;
-        gr.addColorStop(0, dk ? 'rgb(190,190,190)' : 'rgb(255,255,255)');
-        gr.addColorStop(1, 'rgba(128,128,128,0)');
-        x.fillStyle = gr; x.fillRect(0, 0, S, S);
-      }
-      x.globalAlpha = 1;
-      var t = new THREE.CanvasTexture(cv);
-      t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(2, 2);
-      return t;
+    var frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.84, metalness: 0, alphaTest: 0.5 });
+    if (normalCanvas) {
+      var nTex = new THREE.CanvasTexture(normalCanvas);
+      nTex.anisotropy = 4;
+      frontMat.normalMap = nTex;
+      frontMat.normalScale = new THREE.Vector2(0.12, 0.12);
     }
-    function makeNormalTex() {
-      var S = 256, cv = document.createElement('canvas');
-      cv.width = S; cv.height = S;
-      var x = cv.getContext('2d');
-      // Hoehenfeld: weiche niederfrequente Basis + feine Faser
-      var small = document.createElement('canvas');
-      small.width = 24; small.height = 24;
-      var sx = small.getContext('2d');
-      var sid = sx.createImageData(24, 24);
-      for (var i = 0; i < sid.data.length; i += 4) {
-        var v = 110 + Math.random() * 36;
-        sid.data[i] = v; sid.data[i + 1] = v; sid.data[i + 2] = v; sid.data[i + 3] = 255;
-      }
-      sx.putImageData(sid, 0, 0);
-      x.imageSmoothingEnabled = true;
-      x.drawImage(small, 0, 0, S, S);
-      var h = x.getImageData(0, 0, S, S);
-      var hf = new Float32Array(S * S);
-      for (var p = 0; p < S * S; p++) hf[p] = h.data[p * 4] + (Math.random() - 0.5) * 14;
-      var id2 = x.createImageData(S, S);
-      for (var yy = 0; yy < S; yy++) {
-        for (var xx = 0; xx < S; xx++) {
-          var xl = hf[yy * S + ((xx - 1 + S) % S)], xr = hf[yy * S + ((xx + 1) % S)];
-          var yu = hf[((yy - 1 + S) % S) * S + xx], yd = hf[((yy + 1) % S) * S + xx];
-          var nx = (xl - xr) * 0.012, ny = (yu - yd) * 0.012, nz = 1;
-          var il = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
-          var o = (yy * S + xx) * 4;
-          id2.data[o] = (nx * il * 0.5 + 0.5) * 255;
-          id2.data[o + 1] = (ny * il * 0.5 + 0.5) * 255;
-          id2.data[o + 2] = (nz * il * 0.5 + 0.5) * 255;
-          id2.data[o + 3] = 255;
-        }
-      }
-      x.putImageData(id2, 0, 0);
-      var t = new THREE.CanvasTexture(cv);
-      t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(2, 2);
-      return t;
-    }
-    var roughT = makeRoughTex(), normT = makeNormalTex();
-    var frontMat = new THREE.MeshStandardMaterial({
-      map: frontTex, roughness: 1.0, roughnessMap: roughT,
-      normalMap: normT, normalScale: new THREE.Vector2(0.7, 0.7),
-      metalness: 0, alphaTest: 0.5
-    });
-    var backMatL = new THREE.MeshStandardMaterial({
-      map: backTex, roughness: 1.0, roughnessMap: roughT,
-      normalMap: normT, normalScale: new THREE.Vector2(0.55, 0.55),
-      metalness: 0, alphaTest: 0.5
-    });
+    var backMatL = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9, metalness: 0, alphaTest: 0.5 });
     var backMatR = backMatL.clone();
+
+    var nameMat = null;
+    if (nameCanvas) {
+      printName = nameCanvas;
+      nameTex = new THREE.CanvasTexture(nameCanvas);
+      nameTex.encoding = THREE.sRGBEncoding;
+      nameTex.anisotropy = frontTex.anisotropy;
+      nameMat = new THREE.MeshStandardMaterial({
+        map: nameTex,
+        transparent: true,
+        alphaTest: 0.2,
+        roughness: 0.84,
+        metalness: 0,
+        depthWrite: false
+      });
+      nameOnCard = true;
+    }
 
     // Kantenmaterialien: Druck (inkl. Name) laeuft um die Ecke wie bei dickem Karton
     function edgeMat(c) {
@@ -485,31 +604,30 @@
     var mBotR = edgeMat(paperEdge(800, 64, 'h'));
 
     function wing(side) {
-      // Starrer, dicker Fluegel: Front z=0, Rueckseite z=-THICK, 4 bedruckte Kanten
+      // Drehachse an der Aussenkante. Der Fluegel reicht zur Mitte,
+      // der Spalt oeffnet sich dort. Aussenkanten bleiben am Bildrand.
       var L = side === 'L';
       var xOff = L ? halfW / 2 : -halfW / 2;
       var pivot = new THREE.Group();
 
-      var g = new THREE.PlaneGeometry(halfW, cardH, 48, 6);
-      var i, uv = g.attributes.uv;
+      var g = new THREE.PlaneGeometry(halfW, cardH);
+      var uv = g.attributes.uv, i;
       for (i = 0; i < uv.count; i++) uv.setX(i, L ? uv.getX(i) * 0.5 : 0.5 + uv.getX(i) * 0.5);
       g.translate(xOff, 0, 0);
-      // Papier-Realismus (Max 11:46): echter Mittelknick als Vertiefung am Falz
-      // (beide Fluegel bilden zusammen das Tal) + minimale Woelbung nach vorn.
-      var pos = g.attributes.position;
-      for (i = 0; i < pos.count; i++) {
-        var px = pos.getX(i);
-        var u = clamp(L ? px / halfW : -px / halfW, 0, 1);   // 0 = Falz, 1 = Aussenkante
-        var crease = u < 0.09 ? Math.pow(1 - u / 0.09, 2) * 0.032 : 0;
-        var bow = Math.sin(Math.PI * u) * 0.010;
-        pos.setZ(i, bow - crease);
-      }
-      g.computeVertexNormals();
       pivot.add(new THREE.Mesh(g, frontMat));
+
+      if (nameMat) {
+        var gn = new THREE.PlaneGeometry(halfW, cardH);
+        var uvn = gn.attributes.uv, ni;
+        for (ni = 0; ni < uvn.count; ni++) uvn.setX(ni, L ? uvn.getX(ni) * 0.5 : 0.5 + uvn.getX(ni) * 0.5);
+        gn.translate(xOff, 0, 0.004);
+        pivot.add(new THREE.Mesh(gn, nameMat));
+      }
 
       var gb = new THREE.PlaneGeometry(halfW, cardH);
       gb.rotateY(Math.PI);
       gb.translate(xOff, 0, -THICK);
+      hingeUV(gb, side);
       pivot.add(new THREE.Mesh(gb, L ? backMatL : backMatR));
 
       var xIn = L ? halfW : -halfW;
@@ -540,36 +658,121 @@
     pivR = wing('R'); pivR.position.x = halfW;
     cardGroup.add(pivL); cardGroup.add(pivR);
 
-    // Bewegungsunschaerfe (Render-Learning): je Fluegel zwei halbtransparente
-    // Nachzieher, die um 45/90ms aeltere Schwenkwinkel zeigen. Nur Front+Rueck,
-    // ohne Kanten - bei 8-16% Deckkraft faellt das nicht auf und bleibt billig.
     function ghostWing(side, base) {
       var L = side === 'L';
       var xOff = L ? halfW / 2 : -halfW / 2;
       var gp = new THREE.Group();
-      var g = new THREE.PlaneGeometry(halfW, cardH);
-      var uv = g.attributes.uv, i;
-      for (i = 0; i < uv.count; i++) uv.setX(i, L ? uv.getX(i) * 0.5 : 0.5 + uv.getX(i) * 0.5);
-      g.translate(xOff, 0, 0);
-      var gb = new THREE.PlaneGeometry(halfW, cardH);
-      gb.rotateY(Math.PI);
-      gb.translate(xOff, 0, -THICK);
       function gm(src) {
         var m = src.clone();
         m.transparent = true; m.opacity = base;
         m.alphaTest = 0; m.depthWrite = false;
         return m;
       }
-      var mf = gm(frontMat), mb = gm(L ? backMatL : backMatR);
-      gp.add(new THREE.Mesh(g, mf));
-      gp.add(new THREE.Mesh(gb, mb));
+      var g = new THREE.PlaneGeometry(halfW, cardH);
+      var uv = g.attributes.uv, i;
+      for (i = 0; i < uv.count; i++) uv.setX(i, L ? uv.getX(i) * 0.5 : 0.5 + uv.getX(i) * 0.5);
+      g.translate(xOff, 0, 0);
+      gp.add(new THREE.Mesh(g, gm(frontMat)));
+      if (nameMat) {
+        var gn = new THREE.PlaneGeometry(halfW, cardH);
+        var uvn = gn.attributes.uv, ni;
+        for (ni = 0; ni < uvn.count; ni++) uvn.setX(ni, L ? uvn.getX(ni) * 0.5 : 0.5 + uvn.getX(ni) * 0.5);
+        gn.translate(xOff, 0, 0.004);
+        var nm = gm(nameMat);
+        nm.alphaTest = 0.2;
+        gp.add(new THREE.Mesh(gn, nm));
+      }
       gp.position.x = L ? -halfW : halfW;
       gp.visible = false;
       cardGroup.add(gp);
-      return { pivot: gp, mats: [mf, mb], base: base };
+      return { pivot: gp, mats: gp.children.map(function (ch) { return ch.material; }), base: base };
     }
-    ghL = [ghostWing('L', 0.16), ghostWing('L', 0.08)];
-    ghR = [ghostWing('R', 0.16), ghostWing('R', 0.08)];
+    ghL = [ghostWing('L', 0.08), ghostWing('L', 0.035)];
+    ghR = [ghostWing('R', 0.08), ghostWing('R', 0.035)];
+
+    dofFocus = new THREE.Vector3();
+    dofSize = new THREE.Vector2();
+    dofUniforms = {
+      tColor: { value: null },
+      tDepth: { value: null },
+      uNear: { value: camera.near },
+      uFar: { value: camera.far },
+      uFocus: { value: -8 },
+      uPxPerUnit: { value: 400 },
+      uAperture: { value: DOF_APERTURE },
+      uRes: { value: new THREE.Vector2(1, 1) }
+    };
+    dofTarget = new THREE.WebGLRenderTarget(4, 4, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      depthBuffer: true,
+      stencilBuffer: false
+    });
+    dofTarget.texture.generateMipmaps = false;
+    dofTarget.texture.encoding = THREE.sRGBEncoding;
+    dofTarget.depthTexture = new THREE.DepthTexture(4, 4);
+    dofUniforms.tColor.value = dofTarget.texture;
+    dofUniforms.tDepth.value = dofTarget.depthTexture;
+    var dofMat = new THREE.ShaderMaterial({
+      uniforms: dofUniforms,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+      blending: THREE.CustomBlending,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneMinusSrcAlphaFactor,
+      blendSrcAlpha: THREE.OneFactor,
+      blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
+      vertexShader: [
+        'varying vec2 vUv;',
+        'void main() {',
+        '  vUv = uv;',
+        '  gl_Position = vec4(position.xy, 0.0, 1.0);',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform sampler2D tColor;',
+        'uniform sampler2D tDepth;',
+        'uniform float uNear;',
+        'uniform float uFar;',
+        'uniform float uFocus;',
+        'uniform float uPxPerUnit;',
+        'uniform float uAperture;',
+        'uniform vec2 uRes;',
+        'varying vec2 vUv;',
+        'float perspectiveDepthToViewZ(const in float invClipZ, const in float near, const in float far) {',
+        '  return (near * far) / ((far - near) * invClipZ - far);',
+        '}',
+        'void main() {',
+        '  vec4 center = texture2D(tColor, vUv);',
+        '  float depth = texture2D(tDepth, vUv).x;',
+        '  float viewZ = perspectiveDepthToViewZ(depth, uNear, uFar);',
+        '  float forward = max(viewZ - uFocus, 0.0);',
+        '  float radius = forward * uPxPerUnit * uAperture;',
+        '  if (radius < 0.8) {',
+        '    gl_FragColor = center;',
+        '    return;',
+        '  }',
+        '  vec2 texel = vec2(radius / 3.0) / uRes;',
+        '  vec4 acc = vec4(0.0);',
+        '  float wsum = 0.0;',
+        '  for (int y = -3; y <= 3; y++) {',
+        '    for (int x = -3; x <= 3; x++) {',
+        '      float fx = float(x);',
+        '      float fy = float(y);',
+        '      float w = exp(-0.5 * (fx * fx + fy * fy) / 1.35);',
+        '      acc += texture2D(tColor, vUv + vec2(fx, fy) * texel) * w;',
+        '      wsum += w;',
+        '    }',
+        '  }',
+        '  gl_FragColor = acc / wsum;',
+        '}'
+      ].join('\n')
+    });
+    dofScene = new THREE.Scene();
+    dofCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    dofScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), dofMat));
 
     window.addEventListener('resize', fit);
     fit();
@@ -592,20 +795,69 @@
       blobShadow.scale.set(halfW * 2 * 1.52, cardH * 1.3, 1);
       blobShadow.position.set(0.1, -0.18, -0.5);
     }
+    if (dofTarget) {
+      renderer.getDrawingBufferSize(dofSize);
+      var dw = Math.max(1, dofSize.x), dh = Math.max(1, dofSize.y);
+      if (dofTarget.width !== dw || dofTarget.height !== dh) {
+        dofTarget.setSize(dw, dh);
+        dofTarget.depthTexture.image.width = dw;
+        dofTarget.depthTexture.image.height = dh;
+        dofTarget.depthTexture.needsUpdate = true;
+      }
+      dofUniforms.uRes.value.set(dw, dh);
+    }
   }
 
+  var dofChecked = false;
   function renderFrame(dt) {
     if (swayOn) {
       swayT += dt;
       cardGroup.rotation.y = Math.sin(swayT * 0.55) * 0.035;
       cardGroup.rotation.x = Math.sin(swayT * 0.8) * 0.013;
     }
+    glCanvas.style.filter = '';
+    var spread = 0;
+    if (pivL && pivR) {
+      spread = Math.max(
+        Math.sin(Math.min(Math.abs(pivL.rotation.y), Math.PI / 2)),
+        Math.sin(Math.min(Math.abs(pivR.rotation.y), Math.PI / 2))
+      );
+    }
+    // Geschlossen: direkt, mit MSAA, ohne Post. Offen: Karte in den Depth-Target, dann DOF.
+    if (!dofTarget || spread < 0.01) {
+      renderer.setRenderTarget(null);
+      renderer.render(scene, camera);
+      return;
+    }
+    renderer.getDrawingBufferSize(dofSize);
+    dofUniforms.uNear.value = camera.near;
+    dofUniforms.uFar.value = camera.far;
+    renderer.setRenderTarget(dofTarget);
     renderer.render(scene, camera);
+    if (!dofChecked) {
+      dofChecked = true;
+      var gl = renderer.getContext();
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+        renderer.setRenderTarget(null);
+        dofTarget = null;
+        renderer.render(scene, camera);
+        return;
+      }
+    }
+    camera.updateMatrixWorld();
+    dofFocus.set(0, 0, 0).applyMatrix4(camera.matrixWorldInverse);
+    var dist = Math.max(0.05, Math.abs(dofFocus.z));
+    dofUniforms.uFocus.value = dofFocus.z;
+    dofUniforms.uPxPerUnit.value = (dofSize.y * 0.5) / (dist * Math.tan(camera.fov * Math.PI / 360));
+    dofUniforms.uAperture.value = DOF_APERTURE;
+    renderer.setRenderTarget(null);
+    renderer.render(dofScene, dofCam);
   }
 
   // Schwenkwinkel als Funktion der Timeline (auch fuer Nachzieher nutzbar)
-  function wingAngleL(ms) { var tMs = Math.max(0, ms - HOLD_MS); return -openEase(clamp(tMs / SWING_L_MS, 0, 1)) * OPEN_ANGLE; }
-  function wingAngleR(ms) { var tMs = Math.max(0, ms - HOLD_MS); return  openEase(clamp(tMs / SWING_R_MS, 0, 1)) * OPEN_ANGLE; }
+  function wingAngleL(ms) { var t = clamp((ms - holdMs()) / swingL(), 0, 1); return -openEase(t) * openAngle(); }
+  function wingAngleR(ms) { var t = clamp((ms - holdMs()) / swingR(), 0, 1); return  openEase(t) * openAngle(); }
+
   function setGhost(g, aOld, aRef, p) {
     var d = Math.abs(aRef - aOld);
     var on = p < 1 && d > 0.012;
@@ -613,7 +865,7 @@
     if (on) {
       g.pivot.rotation.y = aOld;
       var k = clamp(d / 0.10, 0, 1) * g.base;   // Staerke ~ Schwenkgeschwindigkeit
-      g.mats[0].opacity = k; g.mats[1].opacity = k;
+    g.mats.forEach(function (m) { m.opacity = k; });
     }
   }
 
@@ -624,38 +876,38 @@
 
     if (phase === 'opening' || frozenP !== null) {
       // Gesamt-Fortschritt ueber der 2000ms-Timeline (frozenP = Anteil davon)
-      var ms = frozenP !== null ? frozenP * OPEN_TOTAL : (now - openStart);
-      var tMs = Math.max(0, ms - HOLD_MS);   // 350ms Hold: Karte steht erst still
-      var tL = clamp(tMs / SWING_L_MS, 0, 1);
-      var tR = clamp(tMs / SWING_R_MS, 0, 1);
-      pivL.rotation.y = wingAngleL(ms);   // links schwingt schneller auf (auf den Betrachter zu, wie v3)
-      pivR.rotation.y = wingAngleR(ms);   // rechts hinkt hinterher
+      var ms = frozenP !== null ? frozenP * openTotal() : (now - openStart);
+      var tMs = ms - holdMs();
+      var tL = clamp(tMs / swingL(), 0, 1);
+      var tR = clamp(tMs / swingR(), 0, 1);
+      pivL.rotation.y = wingAngleL(ms);
+      pivR.rotation.y = wingAngleR(ms);
+      glCanvas.style.filter = '';
       var p = tR; // globaler Fortschritt = langsamer rechter Fluegel
       // Nachzieher positionieren (45/90ms hinter dem aktuellen Stand)
       setGhost(ghL[0], wingAngleL(ms - 45), pivL.rotation.y, p);
       setGhost(ghL[1], wingAngleL(ms - 90), wingAngleL(ms - 45), p);
       setGhost(ghR[0], wingAngleR(ms - 45), pivR.rotation.y, p);
       setGhost(ghR[1], wingAngleR(ms - 90), wingAngleR(ms - 45), p);
-      // v3: Kamera schiebt durch das Tor; Karte laeuft dabei aus dem Fokus
-      camera.position.z = z0 * (1 - 0.58 * smooth((p - 0.22) / 0.78));
-      // v3: Tiefenschaerfe beim Heranfahren, max ~10px ab p>0.2
-      var blur = p > 0.2 ? Math.pow(smooth((p - 0.2) / 0.7), 1.1) * 10 : 0;
-      glCanvas.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(1) + 'px)' : '';
+      // Kamera erst spaet durch das Tor, die Karte bleibt waehrend des Knicks scharf (V2: max ~3px, zweite Haelfte)
+      camera.position.z = z0 * (1 - TUNE.camPush * smooth((p - TUNE.camStart) / Math.max(0.05, 1 - TUNE.camStart)));
+      sceneEl.style.filter = '';
+      sceneEl.style.transform = '';
+      sceneImg.style.filter = '';
+      sceneImg.style.transform = '';
+      flightVideo.style.filter = '';
+      flightVideo.style.transform = '';
       // v3: Sway klingt multiplikativ aus
       cardGroup.rotation.y *= 0.85; cardGroup.rotation.x *= 0.85;
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
-      // Name (Live-Ebene) loest sich auf, nur Opacity
-      var kn = 1 - smooth((p - 0.15) / 0.35);
-      cardname.style.opacity = kn;
-      cardname.style.visibility = kn > 0.01 ? 'visible' : 'hidden';
-      // v3: Welt blendet synchron zur Oeffnung ein
-      sceneImg.style.opacity = smooth(p * 2.2);
-      // Rack-Focus: Welt startet unscharf (DOF) und wird beim Durchflug scharf
-      var sb = SCENE_BLUR0 * (1 - smooth((p - 0.18) / 0.6));
-      sceneEl.style.filter = sb > 0.05 ? 'blur(' + sb.toFixed(1) + 'px)' : '';
-      sceneEl.style.transform = sb > 0.05 ? 'scale(1.04)' : '';
-      // v3: Karte fadet im letzten Fuenftel aus
-      glCanvas.style.opacity = p > 0.8 ? Math.max(0, 1 - (p - 0.8) / 0.2) : 1;
+      if (!nameOnCard) {
+        var kn = 1 - smooth(clamp((tL - 0.05) / 0.27, 0, 1));
+        cardname.style.opacity = kn;
+        cardname.style.visibility = kn > 0.02 ? 'visible' : 'hidden';
+        cardname.style.filter = kn < 0.98 ? 'blur(' + ((1 - kn) * 1.1).toFixed(2) + 'px)' : '';
+      }
+      sceneImg.style.opacity = smooth(clamp((tL - TUNE.sceneAt) / 0.20, 0, 1));
+      glCanvas.style.opacity = p > 0.92 ? Math.max(0, 1 - (p - 0.92) / 0.08) : 1;
       if (p >= 1 && frozenP === null) endOpening();
     }
     if (phase !== 'flight' && phase !== 'landing' && phase !== 'player') renderFrame(dt);
@@ -678,7 +930,7 @@
 
   flightVideo.addEventListener('playing', function () {
     videoOK = true;
-    if (phase === 'opening' || phase === 'flight') flightVideo.style.opacity = 1;
+    if (phase === 'opening' || phase === 'flight' || phase === 'landing' || phase === 'player') flightVideo.style.opacity = 1;
   });
   flightVideo.addEventListener('error', function () { videoOK = false; });
   // Letztes Videobild (fertige Szene) bleibt stehen, Player-Karte landet
@@ -1032,10 +1284,11 @@
       if (ap && ap.then) ap.then(function () { audio.pause(); audio.currentTime = 0; audio.muted = false; }, function () { audio.muted = false; });
     } catch (e) { audio.muted = false; }
 
-    // Flug-Video mit Ton starten (User-Geste durch Antippen; fehlt die Datei, bleibt das Standbild)
+    // Flug startet mit dem Tap (User-Geste, iOS) und laeuft hinter der Karte weiter.
     try {
       flightVideo.muted = false;
       flightVideo.volume = 1;
+      flightVideo.currentTime = 0;
       var fv = flightVideo.play();
       if (fv && fv.catch) fv.catch(function () {});
     } catch (e) {}
@@ -1045,10 +1298,7 @@
       swayRotY = cardGroup.rotation.y; swayRotX = cardGroup.rotation.x;
       tapTime = performance.now();
       glCanvas.style.opacity = 1;
-      openStart = tapTime + HOLD_MS;   // Anticipation-Hold: Karte steht 350ms
-      // Rack-Focus ab jetzt: Welt unscharf, bis die Oeffnung den Fokus nach hinten zieht
-      sceneEl.style.filter = 'blur(' + SCENE_BLUR0 + 'px)';
-      sceneEl.style.transform = 'scale(1.04)';
+      openStart = tapTime;
     } else {
       // Fallback ohne WebGL: statische Karte ausblenden, Szene direkt zeigen
       fallback.style.transition = 'opacity .8s ease';
@@ -1067,6 +1317,7 @@
   function endOpening() {
     phase = 'flight';
     glCanvas.style.opacity = 0;
+    glCanvas.style.filter = '';
     sceneImg.style.opacity = 1;
     sceneEl.style.filter = '';
     sceneEl.style.transform = '';
@@ -1075,6 +1326,13 @@
       ghR[0].pivot.visible = false; ghR[1].pivot.visible = false;
     }
     stopLoop();
+    flightVideo.style.opacity = 1;
+    if (flightVideo.paused) {
+      try {
+        var started = flightVideo.play();
+        if (started && started.catch) started.catch(function () {});
+      } catch (e) {}
+    }
     startSnow();
     clearTimeout(flightTimer);
     flightTimer = setTimeout(flightWatchdog, PLACEHOLDER_MS);
@@ -1120,9 +1378,9 @@
     sceneImg.style.opacity = 0;
     sceneEl.style.filter = '';
     sceneEl.style.transform = '';
-    cardname.style.opacity = 1;
+    cardname.style.opacity = nameOnCard ? 0 : 1;
+    cardname.style.visibility = nameOnCard ? 'hidden' : 'visible';
     cardname.style.filter = '';
-    cardname.style.visibility = 'visible';
     veil.classList.remove('is-on');
     card.classList.remove('is-in');
     cardWrap.setAttribute('aria-hidden', 'true');
@@ -1215,11 +1473,120 @@
   track.addEventListener('pointermove', function (e) { if (seeking) seekTo(e.clientX); });
   track.addEventListener('pointerup', function () { seeking = false; });
 
+  function setRecipient(label) {
+    recipient = String(label || 'Julia').replace(/\s+/g, ' ').trim().slice(0, 24) || 'Julia';
+    cardnameText.textContent = recipient.toUpperCase();
+    if (nameTex) {
+      printName = bakeName(recipient);
+      nameTex.image = printName;
+      nameTex.needsUpdate = true;
+    }
+  }
+
+  function setupTune() {
+    var root = document.getElementById('tune');
+    if (!root || root.dataset.ready) return;
+    root.dataset.ready = '1';
+    try {
+      var saved = JSON.parse(localStorage.getItem('echotag-v4-tune') || 'null');
+      if (saved) {
+        Object.keys(TUNE).forEach(function (k) {
+          if (typeof saved[k] === 'number' && isFinite(saved[k])) TUNE[k] = saved[k];
+        });
+      }
+    } catch (e) {}
+
+    var fields = [
+      ['hold', 'Stillstand', 0, 2000, 10],
+      ['left', 'Links', 400, 5000, 10],
+      ['right', 'Rechts', 400, 6000, 10],
+      ['tempo', 'Tempo', 0.4, 1.8, 0.05],
+      ['angle', 'Winkel', 110, 180, 1],
+      ['camStart', 'Kamera ab', 0, 0.9, 0.01],
+      ['camPush', 'Kamera-Zug', 0, 1, 0.01],
+      ['sceneAt', 'Szene ab', 0, 0.6, 0.01]
+    ];
+    var body = document.getElementById('tuneBody');
+    function save() {
+      try { localStorage.setItem('echotag-v4-tune', JSON.stringify(TUNE)); } catch (err) {}
+    }
+    function showEffective() {
+      var el = document.getElementById('tuneEffective');
+      if (el) el.textContent = 'effektiv ' + Math.round(holdMs()) + ' ms still · links ' + Math.round(swingL()) + ' · rechts ' + Math.round(swingR());
+    }
+    fields.forEach(function (f) {
+      var key = f[0], min = f[2], max = f[3], step = f[4];
+      var row = document.createElement('label');
+      row.className = 'tune-row';
+      var lab = document.createElement('span');
+      lab.textContent = f[1];
+      var range = document.createElement('input');
+      range.type = 'range';
+      range.min = String(min); range.max = String(max); range.step = String(step);
+      range.value = String(TUNE[key]);
+      var num = document.createElement('input');
+      num.type = 'number';
+      num.min = String(min); num.max = String(max); num.step = String(step);
+      num.value = String(TUNE[key]);
+      function set(v) {
+        if (!isFinite(v)) return;
+        v = Math.min(max, Math.max(min, v));
+        TUNE[key] = v;
+        range.value = String(v);
+        num.value = String(v);
+        save();
+        showEffective();
+      }
+      range.addEventListener('input', function () { set(parseFloat(range.value)); });
+      num.addEventListener('input', function () { set(parseFloat(num.value)); });
+      row.appendChild(lab);
+      row.appendChild(range);
+      row.appendChild(num);
+      body.appendChild(row);
+    });
+    showEffective();
+
+    var nameInput = document.getElementById('tuneName');
+    nameInput.value = recipient;
+    nameInput.addEventListener('change', function () { setRecipient(nameInput.value); });
+    document.getElementById('tuneOpen').addEventListener('click', function () {
+      replay();
+      setTimeout(open, 80);
+    });
+    document.getElementById('tuneClose').addEventListener('click', replay);
+    document.getElementById('tuneCopy').addEventListener('click', function () {
+      var text = [
+        'hold: ' + TUNE.hold,
+        'links: ' + TUNE.left,
+        'rechts: ' + TUNE.right,
+        'tempo: ' + TUNE.tempo,
+        'winkel: ' + TUNE.angle,
+        'kameraAb: ' + TUNE.camStart,
+        'kameraZug: ' + TUNE.camPush,
+        'szeneAb: ' + TUNE.sceneAt,
+        'effektiv hold/links/rechts: ' + Math.round(holdMs()) + ' / ' + Math.round(swingL()) + ' / ' + Math.round(swingR())
+      ].join('\n');
+      var out = document.getElementById('tuneOut');
+      out.value = text;
+      out.focus();
+      out.select();
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(function () {});
+    });
+    document.getElementById('tuneDefaults').addEventListener('click', function () {
+      try { localStorage.removeItem('echotag-v4-tune'); } catch (e) {}
+      location.reload();
+    });
+    document.getElementById('tuneHide').addEventListener('click', function () {
+      root.classList.toggle('is-mini');
+      this.textContent = root.classList.contains('is-mini') ? 'öffnen' : 'zu';
+    });
+  }
+
   // ============================================================
   //  Start
   // ============================================================
-  function ready(frontCanvas, backCanvas) {
-    var ok = typeof THREE !== 'undefined' && initGL(frontCanvas, backCanvas);
+  function ready(pack) {
+    var ok = typeof THREE !== 'undefined' && initGL(pack.front, pack.back, pack.normal, pack.name);
     if (!ok) {
       glCanvas.style.display = 'none';
       fallback.hidden = false;
@@ -1229,6 +1596,11 @@
 
     // Empfaengername als Live-Textebene (wird nie ins Material eingebrannt)
     cardnameText.textContent = recipient.toUpperCase();
+    if (nameOnCard) {
+      cardname.style.visibility = 'hidden';
+      cardname.style.opacity = 0;
+    }
+    setupTune();
 
     // Debug-/Testzustaende fuer Screenshots
     if (renderer && debugT !== null && !isNaN(debugT)) {
@@ -1268,8 +1640,13 @@
 
   if (audio.readyState >= 1) tDur.textContent = fmt(audio.duration);
 
-  loadFonts()
-    .then(function () { return Promise.all([loadImage('front.jpg'), loadImage('back.jpg')]); })
-    .then(function (imgs) { ready(bakeFrontImg(imgs[0]), bakeFrontImg(imgs[1])); })
-    .catch(function () { ready(bakeFront(), bakeBack()); });
+  Promise.all([
+    loadFonts().catch(function () { return null; }),
+    loadImage('paper-grain.png').catch(function () { return null; }),
+    loadImage('crease.png').catch(function () { return null; })
+  ]).then(function (res) {
+    paperTile = res[1];
+    if (res[2]) captureCrease(res[2]);
+    ready({ front: bakeFront(), back: bakeBack(), normal: makeFrontNormal(), name: bakeName(recipient) });
+  });
 })();
