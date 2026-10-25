@@ -388,7 +388,7 @@
   // ============================================================
   //  3D-Gatefold
   // ============================================================
-  var renderer = null, scene, camera, cardGroup, pivL, pivR, blobShadow, textMats, shadowL, shadowR, crease;
+  var renderer = null, scene, camera, cardGroup, pivL, pivR, blobShadow, textMats, shadowL, shadowR, crease, edgeInL, edgeInR;
   var halfW, cardH = 3.3, z0 = 8;
   var rafId = null, lastFrame = 0;
   var swayOn = true, swayT = 0;
@@ -486,8 +486,10 @@
     var FCW = frontCanvas.width, FCH = frontCanvas.height, FH = FCW / 2;
     var EW = 14; // Quellstreifenbreite im Front-Canvas (v3)
     var mInL = edgeMat(edgeStrip(frontCanvas, FH - EW, 0, EW, FCH, 64, 1600, 'rgb(202,194,180)'));
+    edgeInL = mInL;
     var mOutL = edgeMat(edgeStrip(frontCanvas, 0, 0, EW, FCH, 64, 1600));
     var mInR = edgeMat(edgeStrip(frontCanvas, FH, 0, EW, FCH, 64, 1600, 'rgb(202,194,180)'));
+    edgeInR = mInR;
     var mOutR = edgeMat(edgeStrip(frontCanvas, FCW - EW, 0, EW, FCH, 64, 1600));
     var mTopL = edgeMat(edgeStrip(frontCanvas, 0, 0, FH, EW, 800, 64));
     var mBotL = edgeMat(edgeStrip(frontCanvas, 0, FCH - EW, FH, EW, 800, 64));
@@ -653,6 +655,13 @@
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
       // v3: Welt blendet synchron zur Oeffnung ein
       sceneImg.style.opacity = smooth(p * 2.2);
+      // Falzrollen gehen beim Oeffnen in den Schatten (v2: der Spalt ist dunkles
+      // Karteninneres, kein helles Papier); geschlossen bleibt die warme Kante
+      if (edgeInL) {
+        var ed = 1 - 0.55 * smooth((p - 0.02) / 0.2);
+        edgeInL.color.setRGB(ed, ed * 0.985, ed * 0.96);
+        edgeInR.color.copy(edgeInL.color);
+      }
       // Falzmitte: dunkle Rille ab den ersten Graden, weg sobald die Szene durchkommt
       if (crease) {
         crease.material.opacity = 0.9 * smooth((p - 0.02) / 0.08) * (p > 0.3 ? Math.max(0, 1 - (p - 0.3) / 0.25) : 1);
