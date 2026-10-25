@@ -233,43 +233,14 @@
     tCtx.textAlign = 'left';
     tCtx.textBaseline = 'alphabetic';
 
-    // Falz-Logik (Max 14:13): Der Block bleibt IMMER mittig. Schneidet der
-    // Falz einen Buchstaben, wird die Luecke am Falz symmetrisch verbreitert
-    // (beide Seiten gleich weit raus) - kein Buchstabe im Spalt, Mitte exakt.
+    // Text mittig und am Stueck, Druck laeuft ueber den Falz (Max 14:20, wie v2)
     var FOLD_X = tCv.width / 2;
-    function drawCenteredFoldGap(ctx2, text2, cx0, y2, spacing2) {
-      var chars = text2.split('');
-      var ws = chars.map(function (ch) { return ctx2.measureText(ch).width; });
-      var total = ws.reduce(function (a, b) { return a + b; }, 0) + spacing2 * (chars.length - 1);
-      var x = cx0 - total / 2, ranges = [], i, j;
-      for (i = 0; i < chars.length; i++) { ranges.push([x, x + ws[i]]); x += ws[i] + spacing2; }
-      var shift = new Array(chars.length).fill(0);
-      var m = 6 * S;
-      for (i = 0; i < ranges.length; i++) {
-        var l = ranges[i][0], r = ranges[i][1];
-        if (FOLD_X > l && FOLD_X < r) {
-          if (FOLD_X <= (l + r) / 2 && i > 0) {          // Buchstabe gehoert nach rechts
-            var dR = Math.max(FOLD_X + m - l, ranges[i - 1][1] - FOLD_X + m, 0);
-            for (j = 0; j < i; j++) shift[j] = -dR;
-            for (j = i; j < chars.length; j++) shift[j] = dR;
-          } else {                                        // nach links
-            var nxt = i < chars.length - 1 ? ranges[i + 1][0] : r;
-            var dL = Math.max(r - FOLD_X + m, FOLD_X + m - nxt, 0);
-            for (j = 0; j <= i; j++) shift[j] = -dL;
-            for (j = i + 1; j < chars.length; j++) shift[j] = dL;
-          }
-          break;
-        }
-      }
-      x = cx0 - total / 2;
-      for (i = 0; i < chars.length; i++) { ctx2.fillText(chars[i], x + shift[i], y2); x += ws[i] + spacing2; }
-    }
 
     // "FÜR" (Groesse wie die fruehere Live-Ebene)
     var fuerSize = 26 * S;
     var fuerSpacing = 8 * S;
     tCtx.font = '500 ' + fuerSize + 'px Jost';
-    drawCenteredFoldGap(tCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing);
+    drawSpaced(tCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing);
 
     // Name, auf Kartenbreite passend (Groesse wie die fruehere Live-Ebene)
     var label = name.toUpperCase();
@@ -280,7 +251,7 @@
       size -= 2 * S;
       tCtx.font = '600 ' + size + 'px Jost';
     }
-    drawCenteredFoldGap(tCtx, label, FOLD_X, 847 * S, 0);
+    tCtx.fillText(label, (tCv.width - tCtx.measureText(label).width) / 2, 847 * S);
 
     // Papier in die Buchstaben holen (weich), dann auf die Textform schneiden
     tCtx.globalCompositeOperation = 'soft-light';
@@ -294,9 +265,9 @@
     mCtx.textAlign = 'left';
     mCtx.textBaseline = 'alphabetic';
     mCtx.font = '500 ' + fuerSize + 'px Jost';
-    drawCenteredFoldGap(mCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing);
+    drawSpaced(mCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing);
     mCtx.font = '600 ' + size + 'px Jost';
-    drawCenteredFoldGap(mCtx, label, FOLD_X, 847 * S, 0);
+    mCtx.fillText(label, (mCv.width - mCtx.measureText(label).width) / 2, 847 * S);
     tCtx.globalCompositeOperation = 'destination-in';
     tCtx.drawImage(mCv, 0, 0);
     tCtx.globalCompositeOperation = 'source-over';
