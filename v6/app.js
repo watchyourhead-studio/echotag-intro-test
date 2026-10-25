@@ -333,8 +333,8 @@
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.fillStyle = COLORS.card;
     ctx.textBaseline = 'alphabetic';
-    ctx.font = '500 34px Jost';
-    drawSpaced(ctx, 'ECHOTAG', cv.width / 2 + 10, 1010, 16);
+    ctx.font = '500 20px Jost';
+    drawSpaced(ctx, 'ECHOTAG', cv.width / 2, cv.height - 64, 9);
     ctx.font = '500 26px Jost';
     drawSpaced(ctx, 'FÜR', cv.width / 2, 738, 8);
     ctx.font = '600 79px Jost';
