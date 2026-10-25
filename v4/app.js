@@ -15,10 +15,13 @@
 
   // ---------- Konstanten ----------
   // ---------- Oeffnungs-Choreografie (frameweise aus v2 vermessen) ----------
-  var HOLD_MS = 350;      // Anticipation: Karte steht nach dem Tap kurz still
-  var SWING_L_MS = 1050;  // linker Fluegel (schneller)
-  var SWING_R_MS = 1650;  // rechter Fluegel hinkt ~0,5-0,6s hinterher
-  var OPEN_TOTAL = HOLD_MS + SWING_R_MS;  // ~2000ms gesamt
+  // v3-Oeffnung (Max 09:25: v3 war "fast perfekt") mit genau drei Anpassungen:
+  // a) insgesamt +20% langsamer, b) 350ms v2-Hold vor dem Start,
+  // c) Fluegel-Desync im v2-Verhaeltnis (1050/1650) aufs v3-Tempo skaliert.
+  var HOLD_MS = 350;      // b) Anticipation: Karte steht nach dem Tap kurz still
+  var SWING_L_MS = 1075;  // c) linker Fluegel = 1690 * 1050/1650
+  var SWING_R_MS = 1690;  // a+c) rechter hinkt hinterher; 350+1690 = 2040ms = v3 (1700ms) +20%
+  var OPEN_TOTAL = HOLD_MS + SWING_R_MS;
   // ---------- FLUG-VIDEO (Asset-Slot) ----------
   // Max' KI-Flugvideo kommt als 2-flug.mp4 in diesen Ordner - nur Datei tauschen, kein Code-Eingriff.
   // Solange es fehlt, laeuft das Paris-Standbild (scene.jpg) als Platzhalter.
@@ -35,7 +38,7 @@
   };
   var OPEN_ANGLE = 2.96;  // ~170 Grad
   var CARD_W = 905, CARD_H = 1600;
-  var THICK = 0.028;      // Materialstaerke: 1.5% der Kartenbreite (Max 09:20: 1-2%)
+  var THICK = 0.055;      // Materialstaerke der Karte (v3-Wert, von Max abgenommen)
 
   // ---------- URL-Parameter ----------
   var qs = new URLSearchParams(location.search);
@@ -110,7 +113,7 @@
       return by(t);
     };
   }
-  var openEase = cubicBezier(0.10, -0.24, 0.69, 0.73);  // gemessene v2-Kurve
+  function openEase(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }  // v3: easeInOutCubic
   function smooth(x) { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
 
   function setHint(text, loading) {
@@ -220,6 +223,12 @@
     ctx.fillStyle = g2;
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
+    // EchoTag-Wortmarke im Druck, Jost, dezent - dort, wo bei der Vorlage das
+    // Bart-&-Bastian-Logo sass (Mitte, leicht unterhalb der Kartenmitte)
+    ctx.fillStyle = 'rgba(246,241,232,0.92)';
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = '500 ' + (34 * S) + 'px Jost';
+    drawSpaced(ctx, 'ECHOTAG', cv.width / 2, 1010 * S, 16 * S);
     if (!grainPat) makeGrain(ctx);
     ctx.globalAlpha = 0.4;
     ctx.fillStyle = grainPat;
@@ -440,31 +449,28 @@
     if (phase === 'opening' || frozenP !== null) {
       // Gesamt-Fortschritt ueber der 2000ms-Timeline (frozenP = Anteil davon)
       var ms = frozenP !== null ? frozenP * OPEN_TOTAL : (now - openStart);
-      var tL = clamp(ms / SWING_L_MS, 0, 1);
-      var tR = clamp(ms / SWING_R_MS, 0, 1);
+      var tMs = Math.max(0, ms - HOLD_MS);   // 350ms Hold: Karte steht erst still
+      var tL = clamp(tMs / SWING_L_MS, 0, 1);
+      var tR = clamp(tMs / SWING_R_MS, 0, 1);
       pivL.rotation.y = -openEase(tL) * OPEN_ANGLE;   // links schwingt schneller auf
       pivR.rotation.y =  openEase(tR) * OPEN_ANGLE;   // rechts hinkt hinterher
       var p = tR; // globaler Fortschritt = langsamer rechter Fluegel
-      // Kamera-Push spaet: traegt das Durch-das-Tor-Fliegen am Ende
-      camera.position.z = z0 * (1 - 0.7 * smooth((p - 0.45) / 0.55));
-      // Global-Blur dezent: max ~3px, erst ab der Haelfte
-      var blur = p > 0.5 ? Math.pow(smooth((p - 0.5) / 0.5), 1.1) * 3 : 0;
+      // v3: Kamera schiebt durch das Tor; Karte laeuft dabei aus dem Fokus
+      camera.position.z = z0 * (1 - 0.58 * smooth((p - 0.22) / 0.78));
+      // v3: Tiefenschaerfe beim Heranfahren, max ~10px ab p>0.2
+      var blur = p > 0.2 ? Math.pow(smooth((p - 0.2) / 0.7), 1.1) * 10 : 0;
       glCanvas.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(1) + 'px)' : '';
-      // Sway klingt in den ersten 200ms nach dem Tap aus
-      var sinceTap = now - tapTime;
-      if (sinceTap < 200) {
-        var k = Math.max(0, 1 - sinceTap / 200);
-        cardGroup.rotation.y = swayRotY * k; cardGroup.rotation.x = swayRotX * k;
-      } else { cardGroup.rotation.y *= 0.85; cardGroup.rotation.x *= 0.85; }
+      // v3: Sway klingt multiplikativ aus
+      cardGroup.rotation.y *= 0.85; cardGroup.rotation.x *= 0.85;
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
-      // Name loest sich auf (Live-Ebene, nur Opacity, kein Blur), p 0.15-0.5
+      // Name (Live-Ebene) loest sich auf, nur Opacity
       var kn = 1 - smooth((p - 0.15) / 0.35);
       cardname.style.opacity = kn;
       cardname.style.visibility = kn > 0.01 ? 'visible' : 'hidden';
-      // Welt dahinter blendet spaeter ein
-      sceneImg.style.opacity = smooth((p - 0.3) / 0.7);
-      // Karte verlaesst den Frame physisch; nur ein mini Fade am ganz Ende
-      glCanvas.style.opacity = p > 0.92 ? Math.max(0, 1 - (p - 0.92) / 0.08) : 1;
+      // v3: Welt blendet synchron zur Oeffnung ein
+      sceneImg.style.opacity = smooth(p * 2.2);
+      // v3: Karte fadet im letzten Fuenftel aus
+      glCanvas.style.opacity = p > 0.8 ? Math.max(0, 1 - (p - 0.8) / 0.2) : 1;
       if (p >= 1 && frozenP === null) endOpening();
     }
     if (phase !== 'flight' && phase !== 'landing' && phase !== 'player') renderFrame(dt);
