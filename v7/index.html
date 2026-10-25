@@ -16,7 +16,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preload" href="tag.jpg" as="image">
-<link rel="stylesheet" href="style.css?v=v7f">
+<link rel="stylesheet" href="style.css?v=v7g">
 </head>
 <body>
 <!-- Zeichen-Filter: Tuschelinien zittern leicht, Aquarell franst aus -->
@@ -83,7 +83,8 @@
         <div class="track" id="track" role="slider" aria-label="Fortschritt" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
           <svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true">
             <path d="M3 8 C 40 6.2, 75 9.4, 110 7.4 S 170 6.6, 197 7.8" pathLength="100" class="track-line"/>
-            <path id="fill" d="M3 8 C 40 6.2, 75 9.4, 110 7.4 S 170 6.6, 197 7.8" pathLength="100" class="track-fill"/>
+            <clipPath id="fillClip"><rect id="fillRect" x="0" y="-10" width="0" height="34"/></clipPath>
+            <g clip-path="url(#fillClip)"><path id="fill" d="M3 8 C 40 6.2, 75 9.4, 110 7.4 S 170 6.6, 197 7.8" class="track-fill"/></g>
           </svg>
         </div>
       </div>
@@ -97,6 +98,6 @@
 
   <audio id="voice" src="nachricht.mp3" preload="auto"></audio>
 </div>
-<script src="app.js?v=v7f"></script>
+<script src="app.js?v=v7g"></script>
 </body>
 </html>

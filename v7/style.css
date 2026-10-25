@@ -39,7 +39,7 @@ body {
   transition: color 1.4s ease, text-shadow 1.4s ease;
 }
 /* Erst umfaerben, wenn der Himmel hinter dem Namen schon dunkel ist */
-.greeting.is-night { color: #F3E4C8; text-shadow: 0 0 18px rgba(255, 196, 120, .35); transition-delay: 1.6s; }
+.greeting.is-night { color: #F3E4C8; text-shadow: 0 0 18px rgba(255, 196, 120, .35); transition-delay: .9s; }
 .g-fuer {
   display: block;
   font-weight: 500;
@@ -153,9 +153,9 @@ body {
 .track svg { width: 100%; height: 100%; overflow: visible; }
 .track-line { fill: none; stroke: #2B2A33; stroke-width: 1.1; opacity: .55; vector-effect: non-scaling-stroke; filter: url(#ink); }
 .track-fill {
-  fill: none; stroke: #8E2230; stroke-width: 5; stroke-linecap: round; opacity: 0;
+  fill: none; stroke: #8E2230; stroke-width: 5; stroke-linecap: round; opacity: .62;
   vector-effect: non-scaling-stroke; filter: url(#wash);
-  stroke-dasharray: 0 100;
+  visibility: hidden;
 }
 .time { flex: 0 0 auto; font-size: 12px; color: rgba(35, 36, 58, .7); font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
 

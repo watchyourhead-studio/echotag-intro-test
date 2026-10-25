@@ -13,19 +13,19 @@
 
   var T = {
     drawAt: 250,       // die Feder setzt an
-    drawMs: 4300,      // bis alle Linien gezogen sind
-    paintAt: 3400,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
-    paintMs: 2900,
-    nightAt: 6600,     // ab hier wie v7, Zeiten unten relativ dazu
-    darkMs: 4200,      // Abdunkeln Tag -> Nacht
-    lightAt: 2800,     // erste Lichter, noch waehrend es dunkel wird
-    lightMs: 4600,     // bis alle Lichter brennen
-    snowAt: 900,
-    sparkleAt: 7600,   // Eiffelturm glitzert, wenn alle Lichter brennen
+    drawMs: 4000,      // bis alle Linien gezogen sind
+    paintAt: 3000,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
+    paintMs: 2400,
+    nightAt: 5300,     // ab hier wie v7, Zeiten unten relativ dazu
+    darkMs: 3000,      // Abdunkeln Tag -> Nacht
+    lightAt: 1900,     // erste Lichter, noch waehrend es dunkel wird
+    lightMs: 4000,     // bis alle Lichter brennen
+    snowAt: 500,
+    sparkleAt: 6100,   // Eiffelturm glitzert, wenn alle Lichter brennen
     sparkleMs: 6000,   // so lang wie der Glitzer-Sound
     sparkleEvery: 60000,
-    cardAt: 15200,     // Player kommt, wenn die Szene lebt (ab Tippen)
-    voiceAt: 16400
+    cardAt: 12300,     // Player kommt, wenn die Szene lebt (ab Tippen)
+    voiceAt: 13500
   };
 
   var VOL = { music: .45, musicDucked: .16, atmo: .8, atmoDucked: .4, klick: .5, kette: .45, turm: .4 };
@@ -495,12 +495,14 @@
     if (!isFinite(t) || t < 0) return '0:00';
     return Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
   }
-  // Fortschritt als Aquarellstrich; bei 0 ganz ausblenden, sonst zeichnen runde
-  // Linienkappe und Aquarellfilter links einen roten Strich
+  // Fortschritt als Aquarellstrich hinter einem Schnittfenster, das mit der
+  // Wiedergabe breiter wird. Kein Strichmuster: Safari zeichnete dort an
+  // beiden Enden kleine Linienkappen, auch bei 0.
+  var fillRect = document.getElementById('fillRect');
   function setFill(pct) {
     pct = Math.max(0, Math.min(100, pct));
-    fill.style.strokeDasharray = pct + ' 100';
-    fill.style.opacity = pct > .5 ? '.62' : '0';
+    fillRect.setAttribute('width', String(pct * 2.1));
+    fill.style.visibility = pct > .5 ? 'visible' : 'hidden';
   }
   playBtn.addEventListener('click', function () {
     if (voice.paused) voice.play().catch(function () {}); else voice.pause();
