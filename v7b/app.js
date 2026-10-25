@@ -1,5 +1,5 @@
 /* EchoTag Day & Night (v7b, mit Zeichnen-Intro)
- * Leeres Papier -> "Karte oeffnen" -> die Feder zieht jede Tuschelinie entlang
+ * Umschlag mit Wachssiegel -> "Karte oeffnen" -> Siegel bricht, Umschlag oeffnet sich -> die Feder zieht jede Tuschelinie entlang
  * ihres Strichs -> Aquarell blueht ein -> Himmel dunkelt von oben ab -> Lichter gehen einzeln an
  * (Cafe, Fenster, dann Lichterkette und Baumlichter, die danach funkeln) ->
  * der Eiffelturm glitzert -> Player. Alles live im WebGL-Shader aus drei
@@ -12,11 +12,11 @@
   };
 
   var T = {
-    drawAt: 250,       // die Feder setzt an
+    drawAt: 2150,       // die Feder setzt an
     drawMs: 4000,      // bis alle Linien gezogen sind
-    paintAt: 3000,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
+    paintAt: 4900,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
     paintMs: 2400,
-    nightAt: 4600,     // ab hier wie v7, Zeiten unten relativ dazu
+    nightAt: 6500,     // ab hier wie v7, Zeiten unten relativ dazu
     darkMs: 3000,      // Abdunkeln Tag -> Nacht
     lightAt: 1500,     // erste Lichter, noch waehrend es dunkel wird
     lightMs: 4000,     // bis alle Lichter brennen
@@ -24,8 +24,8 @@
     sparkleAt: 5700,   // Eiffelturm glitzert, wenn alle Lichter brennen
     sparkleMs: 6000,   // so lang wie der Glitzer-Sound
     sparkleEvery: 60000,
-    cardAt: 11200,     // Player kommt, wenn die Szene lebt (ab Tippen)
-    voiceAt: 12400
+    cardAt: 13100,     // Player kommt, wenn die Szene lebt (ab Tippen)
+    voiceAt: 14300
   };
 
   var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .45, turm: .4 };
@@ -53,6 +53,10 @@
   var tCur = document.getElementById('tCur');
   var replayBtn = document.getElementById('replayBtn');
   var giftLink = document.getElementById('giftLink');
+  var env = document.getElementById('env');
+  // Initiale im Wachssiegel: erster Buchstabe des Namens
+  var initial = (recipient.charAt(0) || 'E').toUpperCase();
+  Array.prototype.forEach.call(document.querySelectorAll('.ini'), function (t) { t.textContent = initial; });
   giftLink.href = CONFIG.giftUrl || '#';
 
   // Animierte Groessen: draw/paint 0..1 (Zeichnen, Malen), dark 0..1 (Tag -> Nacht), light 0..1 (Lichter an)
@@ -645,6 +649,10 @@
     if (actx) { actx.resume(); startAmbience(); }
     soundBtn.hidden = false;
     soundBtn.classList.add('is-visible');
+    // Umschlag oeffnen: Siegel bricht, Lasche klappt auf, Umschlag gleitet weg
+    env.classList.add('is-broken');
+    later(function () { env.classList.add('is-flap'); }, 380);
+    later(function () { env.classList.add('is-away'); }, 1150);
     // Erst zeichnet die Feder, dann laeuft das Aquarell ein, dann wird es Nacht
     tween('draw', 1, T.drawMs, T.drawAt);
     tween('paint', 1, T.paintMs, T.paintAt);
@@ -677,6 +685,14 @@
     later(function () { tween('paint', 0, 1300); }, 2500);
     later(function () { tween('draw', 0, 1000); }, 3500);
     if (!hasGL) later(function () { still.src = 'papier.jpg'; }, 2500);
+    // Umschlag wieder verschlossen einblenden
+    later(function () {
+      env.classList.add('is-reset', 'is-fadein');
+      env.classList.remove('is-broken', 'is-flap', 'is-away');
+      void env.offsetWidth;
+      env.classList.remove('is-reset');
+      requestAnimationFrame(function () { env.classList.remove('is-fadein'); });
+    }, 4500);
     later(function () { taplayer.classList.remove('is-hidden'); }, 4600);
   }
 

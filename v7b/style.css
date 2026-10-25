@@ -230,3 +230,29 @@ body {
 .track-row .track { flex: 1; }
 .time { min-width: 0; font-size: 11.5px; line-height: 1; padding-top: 1px; }
 .after { margin-top: 12px; gap: 6px; }
+
+/* --- Umschlag mit Wachssiegel (Startbildschirm) --- */
+.env { position: absolute; inset: 0; z-index: 5; pointer-events: none; perspective: 1500px; perspective-origin: 50% 0; }
+.env svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.env-body { transition: transform 1.15s cubic-bezier(.55, 0, .25, 1), opacity .5s ease .75s; }
+.env-flap {
+  position: absolute; inset: 0;
+  transform-origin: 50% 0;
+  transition: transform 1s cubic-bezier(.45, 0, .2, 1), opacity .35s ease .7s;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+}
+.env-ink { fill: none; stroke: #2B2A33; stroke-width: 2.4; stroke-linecap: round; opacity: .62; filter: url(#envInk); }
+.env-ink.faint { stroke-width: 1.6; opacity: .22; }
+.ini { font-family: 'Jost', sans-serif; font-weight: 500; font-size: 118px; text-anchor: middle; dominant-baseline: central; letter-spacing: 0; }
+.ini-shadow { fill: rgba(25, 0, 4, .55); }
+.ini-light { fill: rgba(235, 130, 130, .38); }
+.ini-main { fill: #5C1219; }
+.seal-half { transform-box: fill-box; transform-origin: 50% 50%; transition: transform .75s cubic-bezier(.3, 0, .6, 1), opacity .45s ease .3s; }
+/* Oeffnen: Siegel bricht, Lasche klappt zum Betrachter und nach oben weg, Umschlag gleitet nach unten */
+.env.is-broken .seal-l { transform: translate(-46px, 70px) rotate(-16deg); opacity: 0; }
+.env.is-broken .seal-r { transform: translate(52px, 90px) rotate(19deg); opacity: 0; }
+.env.is-flap .env-flap { transform: rotateX(-178deg); opacity: 0; }
+.env.is-away .env-body { transform: translateY(105%); opacity: 0; }
+.env.is-reset, .env.is-reset * { transition: none !important; }
+.env.is-fadein { opacity: 0; }
+.env { transition: opacity .9s ease; }
