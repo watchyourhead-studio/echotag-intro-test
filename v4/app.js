@@ -603,6 +603,10 @@
     pile[i] += 0.55;
     if (i > 0) pile[i - 1] += 0.18;
     if (i < pile.length - 1) pile[i + 1] += 0.18;
+    // harte Decke: kein Bin darf ueber capMax wachsen (sonst Saeulen bis Bildrand)
+    if (pile[i] > SNOW.capMax) pile[i] = SNOW.capMax;
+    if (i > 0 && pile[i - 1] > SNOW.capMax) pile[i - 1] = SNOW.capMax;
+    if (i < pile.length - 1 && pile[i + 1] > SNOW.capMax) pile[i + 1] = SNOW.capMax;
     return true;
   }
 
@@ -610,7 +614,7 @@
   function maybeTip() {
     if (!pile || !cardRect) return;
     var n = pile.length;
-    for (var i = 1; i < n - 1; i++) {
+    for (var i = 0; i < n; i++) {
       var h = pile[i];
       if (h < 2) continue;
       var edgeDist = Math.min(i, n - 1 - i) / (n / 2);      // 0 = Ecke, 1 = Mitte
@@ -618,9 +622,9 @@
       var threshold = SNOW.capMax - 4 * (1 - edgeDist);     // Ecken frueher
       if (h >= threshold || (h > SNOW.clumpMin * 0.7 && Math.random() < 0.0015 * edgeBias)) {
         var take = Math.min(h, 6 + Math.random() * 6);
-        pile[i] -= take;
-        if (pile[i - 1] > 1) pile[i - 1] -= take * 0.25;
-        if (pile[i + 1] > 1) pile[i + 1] -= take * 0.25;
+        pile[i] = Math.max(0, pile[i] - take);
+        if (i > 0 && pile[i - 1] > 1) pile[i - 1] = Math.max(0, pile[i - 1] - take * 0.25);
+        if (i < n - 1 && pile[i + 1] > 1) pile[i + 1] = Math.max(0, pile[i + 1] - take * 0.25);
         var x = straightL() + i * BIN + BIN / 2;
         var r = 2.5 + take * 0.45;
         if (edgeDist < 0.35) {
@@ -688,6 +692,7 @@
     }
 
     if (cardLive) maybeTip();
+    if (snowForce && pile) { var m = 0; for (var pi = 0; pi < pile.length; pi++) if (pile[pi] > m) m = pile[pi]; window.__pileMax = m; }
 
     // Slider: entlang des Kreisbogens beschleunigen, an der Seite abloesen
     for (var s = sliders.length - 1; s >= 0; s--) {
