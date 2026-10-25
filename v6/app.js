@@ -194,6 +194,23 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // Eckenradius ~2,5% der Kartenbreite in die Textur einbrennen (Material: alphaTest)
+  function roundCorners(ctx, w, h) {
+    var r = Math.round(w * 0.025);
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(0, 0, w, h, r);
+    else {
+      ctx.moveTo(r, 0);
+      ctx.arcTo(w, 0, w, h, r); ctx.arcTo(w, h, 0, h, r);
+      ctx.arcTo(0, h, 0, 0, r); ctx.arcTo(0, 0, w, 0, r);
+      ctx.closePath();
+    }
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
   // Vorderseite: Creme-Artwork mit eingebackenem Mittelfalz + Korn (card-front.jpg).
   // Mechanik 1:1 aus v3: Artwork zeichnen, Papierkorn drueber. Kein Empfaengername
   // im Bild - der Name ist eine Live-Textebene im DOM (gilt fuer alle Empfaenger).
@@ -216,44 +233,43 @@
     tCtx.textAlign = 'left';
     tCtx.textBaseline = 'alphabetic';
 
-    // Falz-Logik (Max 14:07): Kein Buchstabe darf im Spalt verschluckt werden.
-    // Jeder Textblock wird so verschoben, dass der Falz in die naechste Luecke
-    // zwischen zwei Buchstaben faellt - dynamisch, fuer beliebige Namen.
+    // Falz-Logik (Max 14:13): Der Block bleibt IMMER mittig. Schneidet der
+    // Falz einen Buchstaben, wird die Luecke am Falz symmetrisch verbreitert
+    // (beide Seiten gleich weit raus) - kein Buchstabe im Spalt, Mitte exakt.
     var FOLD_X = tCv.width / 2;
-    function letterRanges(ctx2, text2, cx0, spacing2) {
+    function drawCenteredFoldGap(ctx2, text2, cx0, y2, spacing2) {
       var chars = text2.split('');
       var ws = chars.map(function (ch) { return ctx2.measureText(ch).width; });
       var total = ws.reduce(function (a, b) { return a + b; }, 0) + spacing2 * (chars.length - 1);
-      var x = cx0 - total / 2, ranges = [];
-      chars.forEach(function (ch, i2) { ranges.push([x, x + ws[i2]]); x += ws[i2] + spacing2; });
-      return ranges;
-    }
-    function foldShift(ranges) {
-      for (var i = 0; i < ranges.length; i++) {
-        if (FOLD_X >= ranges[i][0] && FOLD_X <= ranges[i][1]) {
-          var c = (ranges[i][0] + ranges[i][1]) / 2, g;
-          if (FOLD_X < c && i > 0) g = (ranges[i - 1][1] + ranges[i][0]) / 2;
-          else if (i < ranges.length - 1) g = (ranges[i][1] + ranges[i + 1][0]) / 2;
-          else g = (ranges[i - 1][1] + ranges[i][0]) / 2;
-          return g - FOLD_X;
+      var x = cx0 - total / 2, ranges = [], i, j;
+      for (i = 0; i < chars.length; i++) { ranges.push([x, x + ws[i]]); x += ws[i] + spacing2; }
+      var shift = new Array(chars.length).fill(0);
+      var m = 6 * S;
+      for (i = 0; i < ranges.length; i++) {
+        var l = ranges[i][0], r = ranges[i][1];
+        if (FOLD_X > l && FOLD_X < r) {
+          if (FOLD_X <= (l + r) / 2 && i > 0) {          // Buchstabe gehoert nach rechts
+            var dR = Math.max(FOLD_X + m - l, ranges[i - 1][1] - FOLD_X + m, 0);
+            for (j = 0; j < i; j++) shift[j] = -dR;
+            for (j = i; j < chars.length; j++) shift[j] = dR;
+          } else {                                        // nach links
+            var nxt = i < chars.length - 1 ? ranges[i + 1][0] : r;
+            var dL = Math.max(r - FOLD_X + m, FOLD_X + m - nxt, 0);
+            for (j = 0; j <= i; j++) shift[j] = -dL;
+            for (j = i + 1; j < chars.length; j++) shift[j] = dL;
+          }
+          break;
         }
       }
-      return 0;   // Falz liegt schon in einer Luecke
-    }
-    function drawSpacedShift(ctx2, text2, cx0, y2, spacing2, shift) {
-      var chars = text2.split('');
-      var ws = chars.map(function (ch) { return ctx2.measureText(ch).width; });
-      var total = ws.reduce(function (a, b) { return a + b; }, 0) + spacing2 * (chars.length - 1);
-      var x = cx0 - total / 2 + shift;
-      chars.forEach(function (ch, i2) { ctx2.fillText(ch, x, y2); x += ws[i2] + spacing2; });
+      x = cx0 - total / 2;
+      for (i = 0; i < chars.length; i++) { ctx2.fillText(chars[i], x + shift[i], y2); x += ws[i] + spacing2; }
     }
 
     // "FÜR" (Groesse wie die fruehere Live-Ebene)
     var fuerSize = 26 * S;
     var fuerSpacing = 8 * S;
     tCtx.font = '500 ' + fuerSize + 'px Jost';
-    var shF = foldShift(letterRanges(tCtx, 'FÜR', FOLD_X, fuerSpacing));
-    drawSpacedShift(tCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing, shF);
+    drawCenteredFoldGap(tCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing);
 
     // Name, auf Kartenbreite passend (Groesse wie die fruehere Live-Ebene)
     var label = name.toUpperCase();
@@ -264,8 +280,7 @@
       size -= 2 * S;
       tCtx.font = '600 ' + size + 'px Jost';
     }
-    var shN = foldShift(letterRanges(tCtx, label, FOLD_X, 0));
-    drawSpacedShift(tCtx, label, FOLD_X, 847 * S, 0, shN);
+    drawCenteredFoldGap(tCtx, label, FOLD_X, 847 * S, 0);
 
     // Papier in die Buchstaben holen (weich), dann auf die Textform schneiden
     tCtx.globalCompositeOperation = 'soft-light';
@@ -279,9 +294,9 @@
     mCtx.textAlign = 'left';
     mCtx.textBaseline = 'alphabetic';
     mCtx.font = '500 ' + fuerSize + 'px Jost';
-    drawSpacedShift(mCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing, shF);
+    drawCenteredFoldGap(mCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing);
     mCtx.font = '600 ' + size + 'px Jost';
-    drawSpacedShift(mCtx, label, FOLD_X, 847 * S, 0, shN);
+    drawCenteredFoldGap(mCtx, label, FOLD_X, 847 * S, 0);
     tCtx.globalCompositeOperation = 'destination-in';
     tCtx.drawImage(mCv, 0, 0);
     tCtx.globalCompositeOperation = 'source-over';
@@ -292,6 +307,7 @@
     ctx.fillStyle = grainPat;
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
+    roundCorners(ctx, cv.width, cv.height);   // Ecken wie echte Grusskarte (Max 14:13)
     return cv;
   }
 
@@ -313,18 +329,19 @@
     ctx.fillStyle = grainPat;
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
+    roundCorners(ctx, cv.width, cv.height);
     return cv;
   }
 
   // Streifen aus der gebackenen Vorderseite fuer die Kanten: Druck laeuft um die Ecke (v3)
-  function edgeStrip(cv, sx, sy, sw, sh, dw, dh) {
+  function edgeStrip(cv, sx, sy, sw, sh, dw, dh, tone) {
     var c = document.createElement('canvas');
     c.width = dw; c.height = dh;
     var x = c.getContext('2d');
     x.drawImage(cv, sx, sy, sw, sh, 0, 0, dw, dh);
     // Schnittkante matter machen: abgedunkelt + Papierkorn wie Karton
     x.globalCompositeOperation = 'multiply';
-    x.fillStyle = 'rgb(224,224,224)';
+    x.fillStyle = tone || 'rgb(224,224,224)';
     x.fillRect(0, 0, dw, dh);
     x.globalCompositeOperation = 'source-over';
     if (grainPat) {
@@ -425,8 +442,8 @@
     backTex.anisotropy = 4;
 
     // Materialien 1:1 aus v3: einfaches mattes Papier, keine Normal-/Roughness-Maps
-    var frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.95, metalness: 0 });
-    var backMatL = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9, metalness: 0 });
+    var frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.95, metalness: 0, alphaTest: 0.5 });
+    var backMatL = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9, metalness: 0, alphaTest: 0.5 });
     var backMatR = backMatL.clone();
 
     // Kantenmaterialien: Druck (inkl. Name) laeuft um die Ecke wie bei dickem Karton
@@ -438,9 +455,9 @@
     }
     var FCW = frontCanvas.width, FCH = frontCanvas.height, FH = FCW / 2;
     var EW = 14; // Quellstreifenbreite im Front-Canvas (v3)
-    var mInL = edgeMat(edgeStrip(frontCanvas, FH - EW, 0, EW, FCH, 64, 1600));
+    var mInL = edgeMat(edgeStrip(frontCanvas, FH - EW, 0, EW, FCH, 64, 1600, 'rgb(172,164,152)'));
     var mOutL = edgeMat(edgeStrip(frontCanvas, 0, 0, EW, FCH, 64, 1600));
-    var mInR = edgeMat(edgeStrip(frontCanvas, FH, 0, EW, FCH, 64, 1600));
+    var mInR = edgeMat(edgeStrip(frontCanvas, FH, 0, EW, FCH, 64, 1600, 'rgb(172,164,152)'));
     var mOutR = edgeMat(edgeStrip(frontCanvas, FCW - EW, 0, EW, FCH, 64, 1600));
     var mTopL = edgeMat(edgeStrip(frontCanvas, 0, 0, FH, EW, 800, 64));
     var mBotL = edgeMat(edgeStrip(frontCanvas, 0, FCH - EW, FH, EW, 800, 64));
