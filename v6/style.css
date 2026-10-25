@@ -1,0 +1,188 @@
+/* EchoTag Weihnachtskarte V4 - Palette: siehe app.js CONFIG (Kartenfarbe dort aenderbar) */
+@font-face {
+  font-family: 'Jost';
+  src: url('fonts/jost-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: #22306E;
+  display: flex; justify-content: center;
+  font-family: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+}
+.stage {
+  position: relative;
+  width: min(100vw, 56.25vh);
+  height: 100vh; height: 100dvh;
+  overflow: hidden;
+  background: #22306E;
+}
+
+/* --- Flug: Standbild (Platzhalter/Poster) + Video-Slot, Vollbild-Cover --- */
+.scene {
+  position: absolute; inset: 0; z-index: 1;
+  background: transparent; /* kein Deckanstrich: die Karte liegt darunter */
+  overflow: hidden;
+  pointer-events: none;
+}
+#sceneImg, #flight {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none; user-select: none;
+}
+
+/* --- Endszene: Schnee, der sich auf dem Player sammelt --- */
+#snowFx {
+  position: absolute; inset: 0; z-index: 55;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+/* --- Empfaengername: Live-Textebene, wird nie eingebrannt --- */
+.cardname {
+  position: absolute; inset: 0; z-index: 12;
+  pointer-events: none;
+  color: #7C1D25;  /* Weinrot auf Creme */
+  text-align: center;
+}
+.cn-fuer {
+  position: absolute; left: 0; right: 0; top: 44.5%;
+  font-weight: 500;
+  font-size: min(3.31vw, 1.86vh);
+  letter-spacing: min(1.1vw, .62vh);
+  text-transform: uppercase;
+}
+.cn-name {
+  position: absolute; left: 0; right: 0; top: 49%;
+  font-weight: 600;
+  font-size: min(10.17vw, 5.72vh);
+  letter-spacing: .01em;
+}
+
+#gl { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; display: block; } /* UEBER der Szene: Karte klappt vor der Welt auf (v3) */
+
+/* --- Fallback ohne WebGL --- */
+.fallback {
+  position: absolute; inset: 0; background: #22306E;
+}
+.fallback[hidden] { display: none; }
+
+/* --- Uebergangs-Mattierung vor der Player-Karte --- */
+.veil {
+  position: absolute; inset: 0; z-index: 35;
+  background: rgba(246,241,232,.35);
+  opacity: 0; pointer-events: none;
+  transition: opacity 1.0s ease .05s;
+}
+.veil.is-on { opacity: 1; }
+
+/* --- Tap-Ebene / Hinweis --- */
+.taplayer { position: absolute; inset: 0; z-index: 40; cursor: pointer; }
+.taplayer.is-hidden { display: none; }
+.taplayer.is-pass { pointer-events: none; cursor: default; }
+.tap-hint {
+  position: absolute; left: 50%; bottom: max(7%, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: rgba(246,241,232,.95); color: #22306E;
+  padding: 11px 24px; border-radius: 999px; font-size: 14px; letter-spacing: .03em;
+  box-shadow: 0 8px 26px rgba(10,16,44,.35);
+  animation: hintFloat 2.6s ease-in-out infinite;
+  white-space: nowrap;
+}
+@keyframes hintFloat { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-6px); } }
+.tap-hint.is-loading { animation: none; opacity: .78; }
+.testbadge {
+  position: absolute; top: max(12px, env(safe-area-inset-top)); left: 12px; z-index: 60;
+  background: rgba(34,48,110,.5); color: #F6F1E8; font-size: 10px; letter-spacing: .14em;
+  padding: 4px 9px; border-radius: 5px; font-weight: 600;
+}
+
+/* --- Player-Karte --- */
+.card-wrap {
+  position: absolute; inset: 0; z-index: 45;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.card {
+  width: 82%; max-width: 350px;
+  background: #F6F1E8;
+  border: 1px solid rgba(34,48,110,.12);
+  border-radius: 26px;
+  box-shadow: 0 30px 80px rgba(10,16,44,.45), 0 4px 18px rgba(10,16,44,.2);
+  padding: 30px 26px 22px;
+  text-align: center;
+  position: relative;
+  opacity: 0; transform: translateY(26px) scale(.96);
+  transition: opacity .5s ease, transform .65s cubic-bezier(.2,.7,.25,1);
+}
+.card.is-in { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.card-badge { top: 10px; left: 10px; }
+.card-eyebrow {
+  font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+  color: #22306E; font-weight: 600; margin-bottom: 8px;
+}
+.card-title {
+  font-family: 'Jost', -apple-system, 'Segoe UI', Arial, sans-serif;
+  font-weight: 600; font-size: 27px; letter-spacing: .01em;
+  color: #22306E; margin-bottom: 18px;
+}
+.card .anim-item { opacity: 0; transform: translateY(10px); transition: opacity .45s ease, transform .55s ease; }
+.card.is-in .anim-item { opacity: 1; transform: translateY(0); }
+.card.is-in .anim-item[data-i="0"] { transition-delay: .12s; }
+.card.is-in .anim-item[data-i="1"] { transition-delay: .2s; }
+.card.is-in .anim-item[data-i="2"] { transition-delay: .3s; }
+.card.is-in .anim-item[data-i="3"] { transition-delay: .4s; }
+
+.player { margin: 2px 0 12px; }
+.player-label {
+  font-size: 11.5px; letter-spacing: .06em; color: rgba(34,48,110,.55);
+  text-transform: uppercase; margin-bottom: 10px; font-weight: 600;
+}
+.player-row { display: flex; align-items: center; gap: 12px; }
+.play {
+  width: 52px; height: 52px; flex: 0 0 52px; border-radius: 50%;
+  background: #EBC7D2; color: #22306E; border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 20px rgba(34,48,110,.22);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.play:active { transform: scale(.93); box-shadow: 0 4px 12px rgba(34,48,110,.18); }
+.track {
+  position: relative; flex: 1; height: 26px; cursor: pointer;
+  display: flex; align-items: center;
+}
+.track::before {
+  content: ''; position: absolute; left: 0; right: 0; height: 6px;
+  border-radius: 3px; background: rgba(34,48,110,.14);
+}
+.track-fill {
+  position: absolute; left: 0; height: 6px; width: 0;
+  border-radius: 3px; background: #22306E;
+}
+.mute {
+  width: 38px; height: 38px; flex: 0 0 38px; border-radius: 50%;
+  background: transparent; color: rgba(34,48,110,.6); border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.mute:active { background: rgba(34,48,110,.08); }
+.times {
+  display: flex; justify-content: space-between;
+  margin-top: 6px; padding: 0 50px 0 64px;
+  font-size: 11.5px; color: rgba(34,48,110,.6); font-variant-numeric: tabular-nums;
+}
+.replay {
+  background: transparent; border: 0; cursor: pointer;
+  color: #22306E; font-size: 13.5px; font-weight: 600; letter-spacing: .02em;
+  padding: 10px 16px 4px;
+}
+.replay:active { opacity: .6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tap-hint { animation: none; }
+  .card { transition: opacity .3s ease; transform: none; }
+}
