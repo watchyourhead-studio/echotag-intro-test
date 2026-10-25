@@ -198,6 +198,17 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // Blender-Asset-Variante: gebackene Papier-Textur (Korn+Mottling) aus dem
+  // Render-Projekt; runde Ecken wie gehabt per Maske. Kein Empfaengername drin.
+  function bakeFrontImg(im) {
+    var cv = document.createElement('canvas');
+    cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+    var ctx = cv.getContext('2d');
+    ctx.drawImage(im, 0, 0);
+    roundCorners(ctx, cv.width, cv.height);
+    return cv;
+  }
+
   // Vorderseite: NUR eine Farbe, kein Motiv, kein eingebrannter Name.
   // Der Empfaengername ist eine Live-Textebene im DOM (Jost), damit dasselbe
   // Material fuer alle Empfaenger funktioniert.
@@ -265,7 +276,7 @@
     var c = document.createElement('canvas');
     c.width = dw; c.height = dh;
     var x = c.getContext('2d');
-    x.fillStyle = '#f5f1e6';            // warmes Papierweiss wie Karton-Schnitt
+    x.fillStyle = '#faf6ec';            // warmes Papierweiss wie Karton-Schnitt
     x.fillRect(0, 0, dw, dh);
     // leichte Schicht-Struktur entlang der Kante (Kartonage-Lagen)
     x.globalAlpha = 0.12;
@@ -276,7 +287,7 @@
     }
     x.globalAlpha = 1;
     x.globalCompositeOperation = 'multiply';
-    x.fillStyle = 'rgb(235,235,235)';   // mattieren wie Schnittkante
+    x.fillStyle = 'rgb(243,243,243)';   // mattieren wie Schnittkante
     x.fillRect(0, 0, dw, dh);
     x.globalCompositeOperation = 'source-over';
     if (grainPat) {
@@ -359,8 +370,83 @@
     backTex.encoding = THREE.sRGBEncoding;
     backTex.anisotropy = 4;
 
-    var frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.95, metalness: 0, alphaTest: 0.5 });
-    var backMatL = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9, metalness: 0, alphaTest: 0.5 });
+    // Papier-Antwort aufs Licht: feine Faser-Normalen + leicht schwankende Rauheit
+    function makeRoughTex() {
+      var S = 256, cv = document.createElement('canvas');
+      cv.width = S; cv.height = S;
+      var x = cv.getContext('2d');
+      var id = x.createImageData(S, S);
+      for (var i = 0; i < id.data.length; i += 4) {
+        var v = 222 + Math.random() * 24;   // Rauheit ~0.87-0.96
+        id.data[i] = v; id.data[i + 1] = v; id.data[i + 2] = v; id.data[i + 3] = 255;
+      }
+      x.putImageData(id, 0, 0);
+      // grobe Wolken (Papierdichte schwankt flaechenhaft)
+      x.globalAlpha = 0.10;
+      for (var b = 0; b < 9; b++) {
+        var bx = Math.random() * S, by = Math.random() * S, br = 30 + Math.random() * 70;
+        var gr = x.createRadialGradient(bx, by, 0, bx, by, br);
+        var dk = Math.random() < 0.5;
+        gr.addColorStop(0, dk ? 'rgb(190,190,190)' : 'rgb(255,255,255)');
+        gr.addColorStop(1, 'rgba(128,128,128,0)');
+        x.fillStyle = gr; x.fillRect(0, 0, S, S);
+      }
+      x.globalAlpha = 1;
+      var t = new THREE.CanvasTexture(cv);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(2, 2);
+      return t;
+    }
+    function makeNormalTex() {
+      var S = 256, cv = document.createElement('canvas');
+      cv.width = S; cv.height = S;
+      var x = cv.getContext('2d');
+      // Hoehenfeld: weiche niederfrequente Basis + feine Faser
+      var small = document.createElement('canvas');
+      small.width = 24; small.height = 24;
+      var sx = small.getContext('2d');
+      var sid = sx.createImageData(24, 24);
+      for (var i = 0; i < sid.data.length; i += 4) {
+        var v = 110 + Math.random() * 36;
+        sid.data[i] = v; sid.data[i + 1] = v; sid.data[i + 2] = v; sid.data[i + 3] = 255;
+      }
+      sx.putImageData(sid, 0, 0);
+      x.imageSmoothingEnabled = true;
+      x.drawImage(small, 0, 0, S, S);
+      var h = x.getImageData(0, 0, S, S);
+      var hf = new Float32Array(S * S);
+      for (var p = 0; p < S * S; p++) hf[p] = h.data[p * 4] + (Math.random() - 0.5) * 14;
+      var id2 = x.createImageData(S, S);
+      for (var yy = 0; yy < S; yy++) {
+        for (var xx = 0; xx < S; xx++) {
+          var xl = hf[yy * S + ((xx - 1 + S) % S)], xr = hf[yy * S + ((xx + 1) % S)];
+          var yu = hf[((yy - 1 + S) % S) * S + xx], yd = hf[((yy + 1) % S) * S + xx];
+          var nx = (xl - xr) * 0.012, ny = (yu - yd) * 0.012, nz = 1;
+          var il = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+          var o = (yy * S + xx) * 4;
+          id2.data[o] = (nx * il * 0.5 + 0.5) * 255;
+          id2.data[o + 1] = (ny * il * 0.5 + 0.5) * 255;
+          id2.data[o + 2] = (nz * il * 0.5 + 0.5) * 255;
+          id2.data[o + 3] = 255;
+        }
+      }
+      x.putImageData(id2, 0, 0);
+      var t = new THREE.CanvasTexture(cv);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(2, 2);
+      return t;
+    }
+    var roughT = makeRoughTex(), normT = makeNormalTex();
+    var frontMat = new THREE.MeshStandardMaterial({
+      map: frontTex, roughness: 1.0, roughnessMap: roughT,
+      normalMap: normT, normalScale: new THREE.Vector2(0.55, 0.55),
+      metalness: 0, alphaTest: 0.5
+    });
+    var backMatL = new THREE.MeshStandardMaterial({
+      map: backTex, roughness: 1.0, roughnessMap: roughT,
+      normalMap: normT, normalScale: new THREE.Vector2(0.55, 0.55),
+      metalness: 0, alphaTest: 0.5
+    });
     var backMatR = backMatL.clone();
 
     // Kantenmaterialien: Druck (inkl. Name) laeuft um die Ecke wie bei dickem Karton
@@ -385,10 +471,21 @@
       var xOff = L ? halfW / 2 : -halfW / 2;
       var pivot = new THREE.Group();
 
-      var g = new THREE.PlaneGeometry(halfW, cardH);
+      var g = new THREE.PlaneGeometry(halfW, cardH, 48, 6);
       var i, uv = g.attributes.uv;
       for (i = 0; i < uv.count; i++) uv.setX(i, L ? uv.getX(i) * 0.5 : 0.5 + uv.getX(i) * 0.5);
       g.translate(xOff, 0, 0);
+      // Papier-Realismus (Max 11:46): echter Mittelknick als Vertiefung am Falz
+      // (beide Fluegel bilden zusammen das Tal) + minimale Woelbung nach vorn.
+      var pos = g.attributes.position;
+      for (i = 0; i < pos.count; i++) {
+        var px = pos.getX(i);
+        var u = clamp(L ? px / halfW : -px / halfW, 0, 1);   // 0 = Falz, 1 = Aussenkante
+        var crease = u < 0.07 ? Math.pow(1 - u / 0.07, 2) * 0.018 : 0;
+        var bow = Math.sin(Math.PI * u) * 0.010;
+        pos.setZ(i, bow - crease);
+      }
+      g.computeVertexNormals();
       pivot.add(new THREE.Mesh(g, frontMat));
 
       var gb = new THREE.PlaneGeometry(halfW, cardH);
@@ -1153,6 +1250,7 @@
   if (audio.readyState >= 1) tDur.textContent = fmt(audio.duration);
 
   loadFonts()
-    .then(function () { ready(bakeFront(), bakeBack()); })
+    .then(function () { return Promise.all([loadImage('front.jpg'), loadImage('back.jpg')]); })
+    .then(function (imgs) { ready(bakeFrontImg(imgs[0]), bakeFrontImg(imgs[1])); })
     .catch(function () { ready(bakeFront(), bakeBack()); });
 })();
