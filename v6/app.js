@@ -18,7 +18,7 @@
   // Oeffnung 1:1 aus v3 (Max 12:09: NUR die Oeffnung aus v3, exakt kopiert):
   // beide Fluegel synchron, easeInOutCubic, 1700ms, kein Hold, kein Desync.
   // Alles NACH der Oeffnung bleibt der abgenommene v4-Flow (Flug, Player, Schnee, Ton).
-  var OPEN_MS = 1700;
+  var OPEN_MS = 1950;   // Max 14:00: v3-Oeffnung war etwas zu schnell (+15%)
   // ---------- FLUG-VIDEO (Asset-Slot) ----------
   // Max' KI-Flugvideo kommt als 2-flug.mp4 in diesen Ordner - nur Datei tauschen, kein Code-Eingriff.
   // Solange es fehlt, laeuft das Paris-Standbild (scene.jpg) als Platzhalter.
@@ -197,13 +197,62 @@
   // Vorderseite: Creme-Artwork mit eingebackenem Mittelfalz + Korn (card-front.jpg).
   // Mechanik 1:1 aus v3: Artwork zeichnen, Papierkorn drueber. Kein Empfaengername
   // im Bild - der Name ist eine Live-Textebene im DOM (gilt fuer alle Empfaenger).
-  function bakeFront(img) {
+  function bakeFront(img, name) {
     var S = 2;
     var cv = document.createElement('canvas');
     cv.width = CARD_W * S; cv.height = CARD_H * S;
     var ctx = cv.getContext('2d');
     ctx.drawImage(img, 0, 0, cv.width, cv.height);
     if (!grainPat) makeGrain(ctx);
+
+    // Empfaengername wie eingeDRUCKT (Max 14:00), Technik aus v3: Text auf
+    // separater Flaeche, Artwork weich in die Buchstaben mischen, auf Textform
+    // zurueckschneiden. Zur Laufzeit gebacken (Canvas-Textur pro Name) - kein
+    // statisches Asset mit Name, klappt mit den Fluegeln auf (Textur splittet am Falz).
+    var tCv = document.createElement('canvas');
+    tCv.width = cv.width; tCv.height = cv.height;
+    var tCtx = tCv.getContext('2d');
+    tCtx.fillStyle = '#7C1D25';
+    tCtx.textAlign = 'left';
+    tCtx.textBaseline = 'alphabetic';
+
+    // "FÜR" klein mit weiter Laufweite (Position wie bisherige Live-Ebene)
+    var fuerSize = 15 * S;
+    tCtx.font = '500 ' + fuerSize + 'px Jost';
+    drawSpaced(tCtx, 'FÜR', tCv.width / 2, 727 * S, 5 * S);
+
+    // Name, auf Kartenbreite passend
+    var label = name.toUpperCase();
+    var size = 46 * S;
+    var maxW = tCv.width * 0.78;
+    tCtx.font = '600 ' + size + 'px Jost';
+    while (tCtx.measureText(label).width > maxW && size > 16 * S) {
+      size -= 2 * S;
+      tCtx.font = '600 ' + size + 'px Jost';
+    }
+    tCtx.fillText(label, (tCv.width - tCtx.measureText(label).width) / 2, 824 * S);
+
+    // Papier in die Buchstaben holen (weich), dann auf die Textform schneiden
+    tCtx.globalCompositeOperation = 'soft-light';
+    tCtx.globalAlpha = 0.55;
+    tCtx.drawImage(img, 0, 0, tCv.width, tCv.height);
+    tCtx.globalAlpha = 1;
+    var mCv = document.createElement('canvas');
+    mCv.width = tCv.width; mCv.height = tCv.height;
+    var mCtx = mCv.getContext('2d');
+    mCtx.fillStyle = '#000';
+    mCtx.textAlign = 'left';
+    mCtx.textBaseline = 'alphabetic';
+    mCtx.font = '500 ' + fuerSize + 'px Jost';
+    drawSpaced(mCtx, 'FÜR', mCv.width / 2, 727 * S, 5 * S);
+    mCtx.font = '600 ' + size + 'px Jost';
+    mCtx.fillText(label, (mCv.width - mCtx.measureText(label).width) / 2, 824 * S);
+    tCtx.globalCompositeOperation = 'destination-in';
+    tCtx.drawImage(mCv, 0, 0);
+    tCtx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(tCv, 0, 0);
+
+    // Papierkorn ueber den Druck legen
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = grainPat;
     ctx.fillRect(0, 0, cv.width, cv.height);
@@ -252,8 +301,8 @@
     return c;
   }
 
-  // Fallback, falls card-front.jpg nicht laedt: schlichte Creme-Front mit Wortmarke
-  function bakeFrontFallback() {
+  // Fallback, falls card-front.jpg nicht laedt: schlichte Creme-Front mit Wortmarke + Name
+  function bakeFrontFallback(name) {
     var cv = document.createElement('canvas');
     cv.width = CARD_W; cv.height = CARD_H;
     var ctx = cv.getContext('2d');
@@ -262,7 +311,11 @@
     ctx.fillStyle = COLORS.card;
     ctx.textBaseline = 'alphabetic';
     ctx.font = '500 34px Jost';
-    drawSpaced(ctx, 'ECHOTAG', cv.width / 2, 1010, 16);
+    drawSpaced(ctx, 'ECHOTAG', cv.width / 2 + 10, 1010, 16);
+    ctx.font = '500 30px Jost';
+    drawSpaced(ctx, 'FÜR', cv.width / 2, 727, 10);
+    ctx.font = '600 92px Jost';
+    ctx.fillText(name.toUpperCase(), (cv.width - ctx.measureText(name.toUpperCase()).width) / 2, 824);
     return cv;
   }
 
@@ -457,10 +510,6 @@
       // v3: Sway klingt multiplikativ aus
       cardGroup.rotation.y *= 0.85; cardGroup.rotation.x *= 0.85;
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
-      // Name (Live-Ebene) loest sich auf, nur Opacity
-      var kn = 1 - smooth((p - 0.15) / 0.35);
-      cardname.style.opacity = kn;
-      cardname.style.visibility = kn > 0.01 ? 'visible' : 'hidden';
       // v3: Welt blendet synchron zur Oeffnung ein
       sceneImg.style.opacity = smooth(p * 2.2);
       // v3: Karte fadet im letzten Fuenftel aus
@@ -920,9 +969,11 @@
     sceneImg.style.opacity = 0;
     sceneEl.style.filter = '';
     sceneEl.style.transform = '';
-    cardname.style.opacity = 1;
-    cardname.style.filter = '';
-    cardname.style.visibility = 'visible';
+    if (!renderer) {
+      cardname.style.opacity = 1;
+      cardname.style.filter = '';
+      cardname.style.visibility = 'visible';
+    }
     veil.classList.remove('is-on');
     card.classList.remove('is-in');
     cardWrap.setAttribute('aria-hidden', 'true');
@@ -1023,8 +1074,10 @@
     phase = 'closed';
     setHint(HINT_DEFAULT, false);
 
-    // Empfaengername als Live-Textebene (wird nie ins Material eingebrannt)
+    // Empfaengername: mit WebGL in der Kartentextur (gedruckt, klappt mit).
+    // Die DOM-Ebene bleibt nur als Overlay fuer den No-WebGL-Fallback.
     cardnameText.textContent = recipient.toUpperCase();
+    if (ok) cardname.style.display = 'none';
 
     // Debug-/Testzustaende fuer Screenshots
     if (renderer && debugT !== null && !isNaN(debugT)) {
@@ -1066,6 +1119,6 @@
 
   loadFonts()
     .then(function () { return loadImage('card-front.jpg'); })
-    .then(function (img) { ready(bakeFront(img), bakeBack(img)); })
-    .catch(function () { var f = bakeFrontFallback(); ready(f, bakeBack(f)); });
+    .then(function (img) { ready(bakeFront(img, recipient), bakeBack(img)); })
+    .catch(function () { var f = bakeFrontFallback(recipient); ready(f, bakeBack(f)); });
 })();
