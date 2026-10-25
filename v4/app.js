@@ -5,7 +5,8 @@
   //  CONFIG - Kartenfarbe und Palette hier zentral aenderbar
   // ============================================================
   var COLORS = {
-    card:  '#22306E',  // Kartenfront: eine Farbe (Tiefblau)
+    card:  '#7C1D25',  // Kartenfront: weihnachtliches Weinrot (dezent, kein Feuerwehrrot)
+    cardDeep: '#571218',  // Vertiefung am Rand (leichter Verlauf auf der Front)
     cream: '#F6F1E8',  // Innenseiten, Player-Karte, Szene-Papier
     blue:  '#22306E',  // Tiefblau: Schrift, UI
     pink:  '#EBC7D2',  // Akzent
@@ -139,6 +140,23 @@
     var ctx = cv.getContext('2d');
     ctx.fillStyle = COLORS.card;
     ctx.fillRect(0, 0, cv.width, cv.height);
+    // dezenter Verlauf: Mitte etwas heller, Raender vertieft
+    var g = ctx.createRadialGradient(
+      cv.width / 2, cv.height * 0.42, cv.width * 0.1,
+      cv.width / 2, cv.height * 0.5, cv.height * 0.75
+    );
+    g.addColorStop(0, 'rgba(255,235,225,0.10)');
+    g.addColorStop(0.55, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.28)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    var g2 = ctx.createLinearGradient(0, 0, 0, cv.height);
+    g2.addColorStop(0, 'rgba(0,0,0,0)');
+    g2.addColorStop(1, COLORS.cardDeep);
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = g2;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.globalAlpha = 1;
     if (!grainPat) makeGrain(ctx);
     ctx.globalAlpha = 0.4;
     ctx.fillStyle = grainPat;
