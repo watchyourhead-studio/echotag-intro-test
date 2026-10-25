@@ -300,9 +300,21 @@
   var ghL = [], ghR = [];   // Nachzieher fuer Bewegungsunschaerfe
 
   function initGL(frontCanvas, backCanvas) {
-    try {
-      renderer = new THREE.WebGLRenderer({ canvas: glCanvas, alpha: true, antialias: true });
-    } catch (e) { return false; }
+    var ctxTries = 0;
+    while (ctxTries < 3) {
+      try {
+        renderer = new THREE.WebGLRenderer({ canvas: glCanvas, alpha: true, antialias: true });
+        break;
+      } catch (e) {
+        // Manche Browser-Umgebungen belegen den Canvas vorab mit einem 2D-Context;
+        // dann hilft nur ein frisches Element, Retry lohnt nicht auf demselben.
+        ctxTries++;
+        if (ctxTries >= 3) return false;
+        var fresh = glCanvas.cloneNode(false);
+        glCanvas.parentNode.replaceChild(fresh, glCanvas);
+        glCanvas = fresh;
+      }
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
 
@@ -918,6 +930,9 @@
       tapTime = performance.now();
       glCanvas.style.opacity = 1;
       openStart = tapTime + HOLD_MS;   // Anticipation-Hold: Karte steht 350ms
+      // Rack-Focus ab jetzt: Welt unscharf, bis die Oeffnung den Fokus nach hinten zieht
+      sceneEl.style.filter = 'blur(' + SCENE_BLUR0 + 'px)';
+      sceneEl.style.transform = 'scale(1.04)';
     } else {
       // Fallback ohne WebGL: statische Karte ausblenden, Szene direkt zeigen
       fallback.style.transition = 'opacity .8s ease';
@@ -987,8 +1002,8 @@
     try { flightVideo.currentTime = 0; } catch (e) {}
     flightVideo.style.opacity = 0;
     sceneImg.style.opacity = 0;
-    sceneEl.style.filter = 'blur(' + SCENE_BLUR0 + 'px)';
-    sceneEl.style.transform = 'scale(1.04)';
+    sceneEl.style.filter = '';
+    sceneEl.style.transform = '';
     cardname.style.opacity = 1;
     cardname.style.filter = '';
     cardname.style.visibility = 'visible';
@@ -1095,8 +1110,6 @@
     }
     phase = 'closed';
     setHint(HINT_DEFAULT, false);
-    sceneEl.style.filter = 'blur(' + SCENE_BLUR0 + 'px)';
-    sceneEl.style.transform = 'scale(1.04)';
 
     // Empfaengername als Live-Textebene (wird nie ins Material eingebrannt)
     cardnameText.textContent = recipient.toUpperCase();
