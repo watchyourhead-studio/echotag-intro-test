@@ -16,7 +16,7 @@
     lightMs: 5600,     // bis alle Lichter brennen
     snowAt: 2000,
     sparkleAt: 9400,   // Eiffelturm glitzert, wenn alle Lichter brennen
-    sparkleMs: 4200,
+    sparkleMs: 6000,   // so lang wie der Glitzer-Sound
     sparkleEvery: 60000,
     cardAt: 11400,     // Player kommt, wenn die Szene lebt
     voiceAt: 13000
@@ -464,6 +464,13 @@
     if (!isFinite(t) || t < 0) return '0:00';
     return Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
   }
+  // Fortschritt als Aquarellstrich; bei 0 ganz ausblenden, sonst zeichnen runde
+  // Linienkappe und Aquarellfilter links einen roten Strich
+  function setFill(pct) {
+    pct = Math.max(0, Math.min(100, pct));
+    fill.style.strokeDasharray = pct + ' 100';
+    fill.style.opacity = pct > .5 ? '.62' : '0';
+  }
   playBtn.addEventListener('click', function () {
     if (voice.paused) voice.play().catch(function () {}); else voice.pause();
   });
@@ -491,7 +498,7 @@
   voice.addEventListener('timeupdate', function () {
     tCur.textContent = fmt(voice.currentTime);
     track.setAttribute('aria-valuenow', String(Math.round(voice.currentTime)));
-    if (voice.duration > 0) fill.style.strokeDashoffset = String(100 - Math.min(100, voice.currentTime / voice.duration * 100));
+    if (voice.duration > 0) setFill(voice.currentTime / voice.duration * 100);
   });
   function seek(e) {
     if (!voice.duration) return;
@@ -512,7 +519,7 @@
       card.classList.add('is-in'); giftLink.classList.add('is-shown', 'is-in');
       dayNight.hidden = false; dayNight.classList.add('is-visible');
       soundBtn.hidden = false; soundBtn.classList.add('is-visible');
-      fill.style.strokeDashoffset = '62';
+      setFill(38);
     }
   }
 })();
