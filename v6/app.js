@@ -34,6 +34,7 @@
     clumpMin: 9                 // Mindest-Haubenhoehe fuer natuerliches Abkippen
   };
   var OPEN_ANGLE = 2.96;  // ~170 Grad
+  var SWING_ANGLE = 0.72;  // ~41 Grad: v2-Look, Druck bleibt frontal (Max 14:53)
   var CARD_W = 905, CARD_H = 1600;
   var THICK = 0.055;      // Materialstaerke der Karte (v3-Wert)
 
@@ -49,7 +50,6 @@
   var glCanvas = document.getElementById('gl');
   var fallback = document.getElementById('fallback');
   var sceneImg = document.getElementById('sceneImg');
-  var scrim = document.getElementById('scrim');
   var sceneEl = document.getElementById('scene');
   var flightVideo = document.getElementById('flight');
   var snowFxCv = document.getElementById('snowFx');
@@ -346,7 +346,7 @@
   // ============================================================
   //  3D-Gatefold
   // ============================================================
-  var renderer = null, scene, camera, cardGroup, pivL, pivR, blobShadow;
+  var renderer = null, scene, camera, cardGroup, pivL, pivR, blobShadow, shadowL, shadowR;
   var halfW, cardH = 3.3, z0 = 8;
   var rafId = null, lastFrame = 0;
   var swayOn = true, swayT = 0;
@@ -482,6 +482,31 @@
     pivR = wing('R'); pivR.position.x = halfW;
     cardGroup.add(pivL); cardGroup.add(pivR);
 
+    // Weiche Fluegelschatten im Spalt (Max 14:53: "nur der Schatten der jeweiligen
+    // Seite"): Gradient von der Innenkante in den Spalt, liegt auf dem Karteninneren
+    function makeShadow(mirror) {
+      var c = document.createElement('canvas');
+      c.width = 128; c.height = 8;
+      var x = c.getContext('2d');
+      var g = x.createLinearGradient(0, 0, 128, 0);
+      g.addColorStop(0, 'rgba(40,28,20,1)');
+      g.addColorStop(1, 'rgba(40,28,20,0)');
+      x.fillStyle = g; x.fillRect(0, 0, 128, 8);
+      var t = new THREE.CanvasTexture(c);
+      t.encoding = THREE.sRGBEncoding;
+      var m = new THREE.Mesh(
+        new THREE.PlaneGeometry(halfW * 0.5, cardH * 1.12),
+        new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0, side: THREE.DoubleSide })
+      );
+      if (mirror) m.scale.x = -1;
+      m.position.z = -0.3;
+      m.renderOrder = 1;
+      return m;
+    }
+    shadowL = makeShadow(false);
+    shadowR = makeShadow(true);
+    cardGroup.add(shadowL); cardGroup.add(shadowR);
+
 
     window.addEventListener('resize', fit);
     fit();
@@ -524,9 +549,24 @@
       // Oeffnung 1:1 aus v3: beide Fluegel synchron, eine Easing-Kurve, 1700ms
       var p = frozenP !== null ? frozenP : clamp((now - openStart) / OPEN_MS, 0, 1);
       var e = openEase(p);
-      var theta = e * OPEN_ANGLE;
+      // v2-Mechanik (Max 14:53): Fluegel schwingen nur ~41 Grad auf und gleiten
+      // dann auseinander - der Druck bleibt frontal, kein Buchstabe wird in die
+      // Schraege gefressen, der Spalt schneidet den Text nur sauber auseinander
+      var theta = Math.min(e * OPEN_ANGLE, SWING_ANGLE);
       pivL.rotation.y = -theta;
       pivR.rotation.y = theta;
+      var slide = halfW * 1.75 * smooth((p - 0.18) / 0.55);
+      pivL.position.x = -halfW - slide;
+      pivR.position.x = halfW + slide;
+      // Schatten folgt den Innenkanten (Welt-X der Kante aus Pivot + Fluegelbreite)
+      if (shadowL) {
+        var inX = halfW * Math.cos(theta);
+        shadowL.position.x = -halfW - slide + inX + halfW * 0.24;
+        shadowR.position.x = halfW + slide - inX - halfW * 0.24;
+        var shOp = 0.6 * smooth(p * 3) * (p > 0.8 ? Math.max(0, 1 - (p - 0.8) / 0.2) : 1);
+        shadowL.material.opacity = shOp;
+        shadowR.material.opacity = shOp;
+      }
       // v3: Kamera schiebt durch das Tor; Karte laeuft dabei aus dem Fokus
       camera.position.z = z0 * (1 - 0.58 * smooth((p - 0.22) / 0.78));
       // v3: Tiefenschaerfe beim Heranfahren, max ~10px ab p>0.2
@@ -537,10 +577,6 @@
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
       // v3: Welt blendet synchron zur Oeffnung ein
       sceneImg.style.opacity = smooth(p * 2.2);
-      // Karteninnere dunkel wie bei v2 (Max 14:43): der Spalt bleibt waehrend der
-      // Falzphase schwarz-braun, der Print laeuft lesbar durch; die helle Szene
-      // kommt erst, wenn die Fluegel weiter offen sind
-      scrim.style.opacity = 1 - smooth(clamp((p - 0.3) / 0.45, 0, 1));
       // v3: Karte fadet im letzten Fuenftel aus
       glCanvas.style.opacity = p > 0.8 ? Math.max(0, 1 - (p - 0.8) / 0.2) : 1;
       if (p >= 1 && frozenP === null) endOpening();
@@ -960,7 +996,6 @@
     phase = 'flight';
     glCanvas.style.opacity = 0;
     sceneImg.style.opacity = 1;
-    scrim.style.opacity = 0;
     stopLoop();
     startSnow();
     clearTimeout(flightTimer);
@@ -1005,7 +1040,6 @@
     try { flightVideo.currentTime = 0; } catch (e) {}
     flightVideo.style.opacity = 0;
     sceneImg.style.opacity = 0;
-    scrim.style.opacity = 1;
     sceneEl.style.filter = '';
     sceneEl.style.transform = '';
     if (!renderer) {
@@ -1019,6 +1053,8 @@
     if (renderer) {
       frozenP = null;
       pivL.rotation.y = 0; pivR.rotation.y = 0;
+      pivL.position.x = -halfW; pivR.position.x = halfW;
+      if (shadowL) { shadowL.material.opacity = 0; shadowR.material.opacity = 0; }
       glCanvas.style.filter = '';
       camera.position.set(0, 0, z0);
       cardGroup.rotation.set(0, 0, 0);
@@ -1109,7 +1145,6 @@
     if (!ok) {
       glCanvas.style.display = 'none';
       fallback.hidden = false;
-      scrim.style.display = 'none';
     }
     phase = 'closed';
     setHint(HINT_DEFAULT, false);
@@ -1130,7 +1165,6 @@
       cardname.style.opacity = 0;
       cardname.style.visibility = 'hidden';
       sceneImg.style.opacity = 1;
-      scrim.style.opacity = 0;
       sceneEl.style.filter = '';
       sceneEl.style.transform = '';
     }
@@ -1144,7 +1178,6 @@
       sceneEl.style.transform = '';
       phase = 'flight';
       startSnow();
-      scrim.style.opacity = 0;
       veil.style.transition = 'none';
       card.style.transition = 'none';
       taplayer.classList.add('is-hidden');
