@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0E1A3D">
+<title>EchoTag Day &amp; Night</title>
+<link rel="preload" href="tag.jpg" as="image">
+<link rel="stylesheet" href="style.css?v=v7b">
+</head>
+<body>
+<div class="stage" id="stage">
+  <!-- Tag-Bild sofort sichtbar (auch ohne WebGL); das Canvas legt sich darueber -->
+  <img class="still" id="still" src="tag.jpg" alt="">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <canvas id="snow" aria-hidden="true"></canvas>
+
+  <div class="greeting" id="greeting" aria-live="polite">
+    <span class="g-fuer">Für</span>
+    <span class="g-name" id="gName"></span>
+  </div>
+
+  <span class="testbadge">TEST</span>
+
+  <button type="button" class="daynight" id="dayNight" aria-label="Tag oder Nacht" hidden>
+    <span class="dn-knob" aria-hidden="true"></span>
+    <svg class="dn-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <svg class="dn-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.6A7.6 7.6 0 0 1 9.4 4.5a7.6 7.6 0 1 0 10.1 10.1Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  </button>
+
+  <div class="taplayer" id="taplayer" role="button" tabindex="0" aria-label="Karte öffnen">
+    <div class="start-cues">
+      <div class="sound-hint"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6v4h3l4 3V3L5 6H2Z"/><path d="M11 5.5a4 4 0 0 1 0 5M13 3.5a7 7 0 0 1 0 9"/></svg><span>Ton an für das beste Erlebnis</span></div>
+      <div class="tap-hint" id="hint">Tippen zum Öffnen</div>
+    </div>
+  </div>
+
+  <div class="card-wrap" id="cardWrap" aria-hidden="true">
+    <div class="card" id="card">
+      <button type="button" class="play" id="playBtn" aria-label="Abspielen">
+        <svg id="iconPlay" viewBox="0 0 24 24" width="20" height="20"><path d="M8 5.5v13a1 1 0 0 0 1.52.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>
+        <svg id="iconPause" viewBox="0 0 24 24" width="20" height="20" style="display:none"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>
+      </button>
+      <div class="card-body">
+        <p class="card-eyebrow">EchoTag</p>
+        <h1 class="card-title">Deine Sprachnachricht</h1>
+        <div class="track" id="track" role="slider" aria-label="Fortschritt" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+          <div class="track-fill" id="fill"></div>
+        </div>
+      </div>
+      <span class="time" id="tCur">0:00</span>
+    </div>
+    <button type="button" class="replay" id="replayBtn">Nochmal erleben</button>
+  </div>
+
+  <audio id="voice" src="sample-audio.mp3" preload="auto"></audio>
+</div>
+<script src="app.js?v=v7b"></script>
+</body>
+</html>
