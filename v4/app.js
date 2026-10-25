@@ -14,7 +14,11 @@
   };
 
   // ---------- Konstanten ----------
-  var OPEN_MS = 1700;     // Dauer der Gatefold-Oeffnung
+  // ---------- Oeffnungs-Choreografie (frameweise aus v2 vermessen) ----------
+  var HOLD_MS = 350;      // Anticipation: Karte steht nach dem Tap kurz still
+  var SWING_L_MS = 1050;  // linker Fluegel (schneller)
+  var SWING_R_MS = 1650;  // rechter Fluegel hinkt ~0,5-0,6s hinterher
+  var OPEN_TOTAL = HOLD_MS + SWING_R_MS;  // ~2000ms gesamt
   // ---------- FLUG-VIDEO (Asset-Slot) ----------
   // Max' KI-Flugvideo kommt als 2-flug.mp4 in diesen Ordner - nur Datei tauschen, kein Code-Eingriff.
   // Solange es fehlt, laeuft das Paris-Standbild (scene.jpg) als Platzhalter.
@@ -80,7 +84,33 @@
     return m + ':' + String(s).padStart(2, '0');
   }
   function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
-  function easeInOutCubic(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
+  // cubic-bezier-Looper (wie CSS): Stuetzstellen v2: 14->0, 30->19, 46->32, 62->58, 78->77, 90->89
+  function cubicBezier(x1, y1, x2, y2) {
+    function bx(t) { var u = 1 - t; return 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t; }
+    function by(t) { var u = 1 - t; return 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t; }
+    function dBx(t) { var u = 1 - t; return 3 * u * u * x1 + 6 * u * t * (x2 - x1) + 3 * t * t * (1 - x2); }
+    return function (x) {
+      if (x <= 0) return by(0);
+      if (x >= 1) return by(1);
+      var t = x;
+      for (var i = 0; i < 6; i++) {
+        var e = bx(t) - x;
+        var d = dBx(t);
+        if (Math.abs(d) < 1e-4) break;
+        t -= e / d;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+      }
+      if (Math.abs(bx(t) - x) > 1e-4) {
+        var lo = 0, hi = 1;
+        for (var j = 0; j < 32; j++) {
+          t = (lo + hi) / 2;
+          if (bx(t) < x) lo = t; else hi = t;
+        }
+      }
+      return by(t);
+    };
+  }
+  var openEase = cubicBezier(0.10, -0.24, 0.69, 0.73);  // gemessene v2-Kurve
   function smooth(x) { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
 
   function setHint(text, loading) {
@@ -114,7 +144,7 @@
     var id = gc.createImageData(128, 128);
     for (var i = 0; i < id.data.length; i += 4) {
       var v = 118 + Math.random() * 20;
-      id.data[i] = v; id.data[i + 1] = v; id.data[i + 2] = v; id.data[i + 3] = 26;
+      id.data[i] = v; id.data[i + 1] = v; id.data[i + 2] = v; id.data[i + 3] = 98;
     }
     gc.putImageData(id, 0, 0);
     grainPat = ctx.createPattern(g, 'repeat');
@@ -129,6 +159,37 @@
       ctx.fillText(c, x, y);
       x += widths[i] + spacing;
     });
+  }
+
+  // Grossflaechiges Papier-Mottling (Low-Frequency), wie v2-Embossing
+  function mottle(ctx, w, h) {
+    for (var i = 0; i < 14; i++) {
+      var x = Math.random() * w, y = Math.random() * h;
+      var r = (0.25 + Math.random() * 0.45) * Math.max(w, h);
+      var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      var dark = Math.random() < 0.5;
+      var a = 0.03 + Math.random() * 0.035;
+      g.addColorStop(0, dark ? 'rgba(0,0,0,' + a.toFixed(3) + ')' : 'rgba(255,255,255,' + a.toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+
+  // Eckenradius ~2,5% der Kartenbreite in die Textur einbrennen (Material: alphaTest)
+  function roundCorners(ctx, w, h) {
+    var r = Math.round(w * 0.025);
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(0, 0, w, h, r);
+    else {
+      ctx.moveTo(r, 0);
+      ctx.arcTo(w, 0, w, h, r); ctx.arcTo(w, h, 0, h, r);
+      ctx.arcTo(0, h, 0, 0, r); ctx.arcTo(0, 0, w, 0, r);
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   // Vorderseite: NUR eine Farbe, kein Motiv, kein eingebrannter Name.
@@ -163,6 +224,8 @@
     ctx.fillStyle = grainPat;
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
+    mottle(ctx, cv.width, cv.height);
+    roundCorners(ctx, cv.width, cv.height);
     return cv;
   }
 
@@ -179,6 +242,8 @@
     ctx.fillStyle = grainPat;
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
+    mottle(ctx, cv.width, cv.height);
+    roundCorners(ctx, cv.width, cv.height);
     return cv;
   }
 
@@ -208,6 +273,7 @@
   var halfW, cardH = 3.3, z0 = 8;
   var rafId = null, lastFrame = 0;
   var swayOn = true, swayT = 0;
+  var tapTime = 0, swayRotY = 0, swayRotX = 0;
   var openStart = 0, frozenP = null;
 
   function initGL(frontCanvas, backCanvas) {
@@ -258,8 +324,8 @@
     backTex.encoding = THREE.sRGBEncoding;
     backTex.anisotropy = 4;
 
-    var frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.95, metalness: 0 });
-    var backMatL = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9, metalness: 0 });
+    var frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.95, metalness: 0, alphaTest: 0.5 });
+    var backMatL = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9, metalness: 0, alphaTest: 0.5 });
     var backMatR = backMatL.clone();
 
     // Kantenmaterialien: Druck (inkl. Name) laeuft um die Ecke wie bei dickem Karton
@@ -363,25 +429,33 @@
     lastFrame = now;
 
     if (phase === 'opening' || frozenP !== null) {
-      var p = frozenP !== null ? frozenP : clamp((now - openStart) / OPEN_MS, 0, 1);
-      var e = easeInOutCubic(p);
-      var theta = e * OPEN_ANGLE;
-      pivL.rotation.y = -theta;
-      pivR.rotation.y = theta;
-      // Kamera schiebt durch das Tor; Karte läuft dabei aus dem Fokus (Kamerafahrt)
-      camera.position.z = z0 * (1 - 0.58 * smooth((p - 0.22) / 0.78));
-      var blur = p > 0.2 ? Math.pow(smooth((p - 0.2) / 0.7), 1.1) * 10 : 0;
+      // Gesamt-Fortschritt ueber der 2000ms-Timeline (frozenP = Anteil davon)
+      var ms = frozenP !== null ? frozenP * OPEN_TOTAL : (now - openStart);
+      var tL = clamp(ms / SWING_L_MS, 0, 1);
+      var tR = clamp(ms / SWING_R_MS, 0, 1);
+      pivL.rotation.y = -openEase(tL) * OPEN_ANGLE;   // links schwingt schneller auf
+      pivR.rotation.y =  openEase(tR) * OPEN_ANGLE;   // rechts hinkt hinterher
+      var p = tR; // globaler Fortschritt = langsamer rechter Fluegel
+      // Kamera-Push spaet: traegt das Durch-das-Tor-Fliegen am Ende
+      camera.position.z = z0 * (1 - 0.7 * smooth((p - 0.45) / 0.55));
+      // Global-Blur dezent: max ~3px, erst ab der Haelfte
+      var blur = p > 0.5 ? Math.pow(smooth((p - 0.5) / 0.5), 1.1) * 3 : 0;
       glCanvas.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(1) + 'px)' : '';
-      cardGroup.rotation.y *= 0.85; cardGroup.rotation.x *= 0.85;
+      // Sway klingt in den ersten 200ms nach dem Tap aus
+      var sinceTap = now - tapTime;
+      if (sinceTap < 200) {
+        var k = Math.max(0, 1 - sinceTap / 200);
+        cardGroup.rotation.y = swayRotY * k; cardGroup.rotation.x = swayRotX * k;
+      } else { cardGroup.rotation.y *= 0.85; cardGroup.rotation.x *= 0.85; }
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
-      // Name loest sich zu Beginn der Oeffnung auf (Live-Ebene, kein Einbrennen)
-      var kn = 1 - smooth((p - 0.05) / 0.25);
+      // Name loest sich auf (Live-Ebene, nur Opacity, kein Blur), p 0.15-0.5
+      var kn = 1 - smooth((p - 0.15) / 0.35);
       cardname.style.opacity = kn;
-      cardname.style.filter = kn > 0.01 ? 'blur(' + ((1 - kn) * 14).toFixed(1) + 'px)' : '';
       cardname.style.visibility = kn > 0.01 ? 'visible' : 'hidden';
-      // Welt dahinter blendet synchron zur Oeffnung ein
-      sceneImg.style.opacity = smooth(p * 2.2);
-      if (p > 0.8) glCanvas.style.opacity = Math.max(0, 1 - (p - 0.8) / 0.2);
+      // Welt dahinter blendet spaeter ein
+      sceneImg.style.opacity = smooth((p - 0.3) / 0.7);
+      // Karte verlaesst den Frame physisch; nur ein mini Fade am ganz Ende
+      glCanvas.style.opacity = p > 0.92 ? Math.max(0, 1 - (p - 0.92) / 0.08) : 1;
       if (p >= 1 && frozenP === null) endOpening();
     }
     if (phase !== 'flight' && phase !== 'landing' && phase !== 'player') renderFrame(dt);
@@ -763,8 +837,10 @@
 
     if (renderer) {
       swayOn = false;
+      swayRotY = cardGroup.rotation.y; swayRotX = cardGroup.rotation.x;
+      tapTime = performance.now();
       glCanvas.style.opacity = 1;
-      openStart = performance.now();
+      openStart = tapTime + HOLD_MS;   // Anticipation-Hold: Karte steht 350ms
     } else {
       // Fallback ohne WebGL: statische Karte ausblenden, Szene direkt zeigen
       fallback.style.transition = 'opacity .8s ease';
