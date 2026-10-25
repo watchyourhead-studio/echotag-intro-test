@@ -578,6 +578,8 @@
     var r = snowFxCv.getBoundingClientRect();
     var W = r.width, H = r.height;
     snowCtx.clearRect(0, 0, W, H);
+    // Erst sammeln, wenn die Player-Karte gelandet ist - vorher nur Schneefall
+    var cardLive = (phase === 'landing' || phase === 'player');
 
     // Flocken bewegen
     for (var i = 0; i < flakes.length; i++) {
@@ -587,7 +589,7 @@
       f.y += f.vy * dt;
 
       var done = false;
-      if (cardRect) {
+      if (cardLive && cardRect) {
         var side = inCornerZone(f.x);
         if (side !== 0) {
           // Eckenzone: auf der Kurve landen -> seitlich abrutschen
@@ -609,7 +611,7 @@
       snowCtx.fill();
     }
 
-    maybeTip();
+    if (cardLive) maybeTip();
 
     // Slider: entlang des Kreisbogens beschleunigen, an der Seite abloesen
     for (var s = sliders.length - 1; s >= 0; s--) {
@@ -665,7 +667,7 @@
     }
 
     // Haube: nur auf dem geraden Abschnitt der Oberkante
-    if (pile && cardRect && cardRect.width > 0) {
+    if (cardLive && pile && cardRect && cardRect.width > 0) {
       snowCtx.beginPath();
       snowCtx.moveTo(straightL(), cardRect.top + 2);
       for (var b = 0; b < pile.length; b++) {
