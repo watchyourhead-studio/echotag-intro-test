@@ -73,3 +73,19 @@ order[order == 255] = 128
 
 Image.fromarray(np.dstack([order, spark, phase])).save(OUT + 'lichter.png', optimize=True)
 print('Lichtquellen:', len(blobs), 'davon Funkelpunkte:', sum(1 for b_ in blobs if b_[0] < 60))
+
+# Eiffelturm: Punkte auf den Tuschelinien fuers stuendliche Funkeln
+import json
+from PIL import ImageDraw
+poly = [(.448, .215), (.465, .215), (.485, .33), (.51, .41), (.545, .49), (.545, .52),
+        (.38, .52), (.38, .49), (.41, .41), (.435, .33)]
+pm = Image.new('L', (W, H), 0)
+ImageDraw.Draw(pm).polygon([(x * W, y * H) for x, y in poly], fill=255)
+g = np.asarray(tag.convert('L')).astype(np.int16)
+ink = (g < 165) & (np.asarray(pm) > 0)
+ys, xs = np.nonzero(ink)
+pick = random.sample(range(len(xs)), min(600, len(xs)))
+pts = [[round(xs[i] / W, 4), round(ys[i] / H, 4)] for i in pick]
+with open(OUT + 'turm.json', 'w') as f:
+    json.dump(pts, f, separators=(',', ':'))
+print('Turmpunkte:', len(pts), 'von', len(xs))
