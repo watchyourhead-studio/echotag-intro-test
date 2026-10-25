@@ -37,6 +37,7 @@
   var qs = new URLSearchParams(location.search);
   var recipient = (qs.get('name') || 'Julia').replace(/\s+/g, ' ').trim().slice(0, 24) || 'Julia';
   var debugState = qs.get('state');
+  var snowForce = qs.get('snowforce') === '1';   // Debug: Schnee auch bei verstecktem Tab (Cloud-Test)
   var debugT = qs.has('t') ? parseFloat(qs.get('t')) : null;
 
   // ---------- DOM ----------
@@ -693,6 +694,7 @@
     snowStep(now, dt);
   }
 
+  var snowIv = null;
   function startSnow() {
     if (!SNOW.enabled || snowOn) return;
     snowOn = true;
@@ -703,10 +705,18 @@
     clumps = []; sliders = [];
     snowLast = performance.now();
     snowRaf = requestAnimationFrame(snowLoop);
+    if (snowForce) {
+      // Debug-Treiber: rAF schlaeft in versteckten Tabs, Intervall laeuft (gedrosselt) weiter
+      snowIv = setInterval(function () {
+        if (!snowOn) return;
+        for (var k = 0; k < 10; k++) snowStep(performance.now(), 0.05);
+      }, 500);
+    }
   }
 
   function stopSnow() {
     snowOn = false;
+    if (snowIv !== null) { clearInterval(snowIv); snowIv = null; }
     if (snowRaf !== null) { cancelAnimationFrame(snowRaf); snowRaf = null; }
     if (snowCtx) {
       var r = snowFxCv.getBoundingClientRect();
@@ -717,7 +727,7 @@
 
   // Pausieren bei verstecktem Tab
   document.addEventListener('visibilitychange', function () {
-    if (!SNOW.enabled) return;
+    if (!SNOW.enabled || snowForce) return;
     if (document.hidden) {
       if (snowRaf !== null) { cancelAnimationFrame(snowRaf); snowRaf = null; }
     } else if (snowOn && snowRaf === null) {
