@@ -216,21 +216,56 @@
     tCtx.textAlign = 'left';
     tCtx.textBaseline = 'alphabetic';
 
-    // "FÜR" klein mit weiter Laufweite (Position wie bisherige Live-Ebene)
-    var fuerSize = 15 * S;
-    tCtx.font = '500 ' + fuerSize + 'px Jost';
-    drawSpaced(tCtx, 'FÜR', tCv.width / 2, 727 * S, 5 * S);
+    // Falz-Logik (Max 14:07): Kein Buchstabe darf im Spalt verschluckt werden.
+    // Jeder Textblock wird so verschoben, dass der Falz in die naechste Luecke
+    // zwischen zwei Buchstaben faellt - dynamisch, fuer beliebige Namen.
+    var FOLD_X = tCv.width / 2;
+    function letterRanges(ctx2, text2, cx0, spacing2) {
+      var chars = text2.split('');
+      var ws = chars.map(function (ch) { return ctx2.measureText(ch).width; });
+      var total = ws.reduce(function (a, b) { return a + b; }, 0) + spacing2 * (chars.length - 1);
+      var x = cx0 - total / 2, ranges = [];
+      chars.forEach(function (ch, i2) { ranges.push([x, x + ws[i2]]); x += ws[i2] + spacing2; });
+      return ranges;
+    }
+    function foldShift(ranges) {
+      for (var i = 0; i < ranges.length; i++) {
+        if (FOLD_X >= ranges[i][0] && FOLD_X <= ranges[i][1]) {
+          var c = (ranges[i][0] + ranges[i][1]) / 2, g;
+          if (FOLD_X < c && i > 0) g = (ranges[i - 1][1] + ranges[i][0]) / 2;
+          else if (i < ranges.length - 1) g = (ranges[i][1] + ranges[i + 1][0]) / 2;
+          else g = (ranges[i - 1][1] + ranges[i][0]) / 2;
+          return g - FOLD_X;
+        }
+      }
+      return 0;   // Falz liegt schon in einer Luecke
+    }
+    function drawSpacedShift(ctx2, text2, cx0, y2, spacing2, shift) {
+      var chars = text2.split('');
+      var ws = chars.map(function (ch) { return ctx2.measureText(ch).width; });
+      var total = ws.reduce(function (a, b) { return a + b; }, 0) + spacing2 * (chars.length - 1);
+      var x = cx0 - total / 2 + shift;
+      chars.forEach(function (ch, i2) { ctx2.fillText(ch, x, y2); x += ws[i2] + spacing2; });
+    }
 
-    // Name, auf Kartenbreite passend
+    // "FÜR" (Groesse wie die fruehere Live-Ebene)
+    var fuerSize = 26 * S;
+    var fuerSpacing = 8 * S;
+    tCtx.font = '500 ' + fuerSize + 'px Jost';
+    var shF = foldShift(letterRanges(tCtx, 'FÜR', FOLD_X, fuerSpacing));
+    drawSpacedShift(tCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing, shF);
+
+    // Name, auf Kartenbreite passend (Groesse wie die fruehere Live-Ebene)
     var label = name.toUpperCase();
-    var size = 46 * S;
+    var size = 79 * S;
     var maxW = tCv.width * 0.78;
     tCtx.font = '600 ' + size + 'px Jost';
     while (tCtx.measureText(label).width > maxW && size > 16 * S) {
       size -= 2 * S;
       tCtx.font = '600 ' + size + 'px Jost';
     }
-    tCtx.fillText(label, (tCv.width - tCtx.measureText(label).width) / 2, 824 * S);
+    var shN = foldShift(letterRanges(tCtx, label, FOLD_X, 0));
+    drawSpacedShift(tCtx, label, FOLD_X, 847 * S, 0, shN);
 
     // Papier in die Buchstaben holen (weich), dann auf die Textform schneiden
     tCtx.globalCompositeOperation = 'soft-light';
@@ -244,9 +279,9 @@
     mCtx.textAlign = 'left';
     mCtx.textBaseline = 'alphabetic';
     mCtx.font = '500 ' + fuerSize + 'px Jost';
-    drawSpaced(mCtx, 'FÜR', mCv.width / 2, 727 * S, 5 * S);
+    drawSpacedShift(mCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing, shF);
     mCtx.font = '600 ' + size + 'px Jost';
-    mCtx.fillText(label, (mCv.width - mCtx.measureText(label).width) / 2, 824 * S);
+    drawSpacedShift(mCtx, label, FOLD_X, 847 * S, 0, shN);
     tCtx.globalCompositeOperation = 'destination-in';
     tCtx.drawImage(mCv, 0, 0);
     tCtx.globalCompositeOperation = 'source-over';
@@ -312,10 +347,10 @@
     ctx.textBaseline = 'alphabetic';
     ctx.font = '500 34px Jost';
     drawSpaced(ctx, 'ECHOTAG', cv.width / 2 + 10, 1010, 16);
-    ctx.font = '500 30px Jost';
-    drawSpaced(ctx, 'FÜR', cv.width / 2, 727, 10);
-    ctx.font = '600 92px Jost';
-    ctx.fillText(name.toUpperCase(), (cv.width - ctx.measureText(name.toUpperCase()).width) / 2, 824);
+    ctx.font = '500 26px Jost';
+    drawSpaced(ctx, 'FÜR', cv.width / 2, 738, 8);
+    ctx.font = '600 79px Jost';
+    ctx.fillText(name.toUpperCase(), (cv.width - ctx.measureText(name.toUpperCase()).width) / 2, 847);
     return cv;
   }
 
