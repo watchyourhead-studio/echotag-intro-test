@@ -14,10 +14,20 @@
 
   // ---------- Konstanten ----------
   var OPEN_MS = 1700;     // Dauer der Gatefold-Oeffnung
-  var SCENE_MS = 6000;    // Dauer der Zeichen-Flugphase bis die Player-Karte einfliegt
-  var STROKE_DUR = 0.15;  // Anteil: Strich-Phase pro Ebene
-  var COLOR_DUR = 0.20;   // Anteil: Farb-Phase pro Ebene
-  var CAM_Z = 80;         // Kamera-Dolly in px (Perspektive 1000), bewusst leicht
+  // ---------- FLUG-VIDEO (Asset-Slot) ----------
+  // Max' KI-Flugvideo kommt als 2-flug.mp4 in diesen Ordner - nur Datei tauschen, kein Code-Eingriff.
+  // Solange es fehlt, laeuft das Paris-Standbild (scene.jpg) als Platzhalter.
+  var VIDEO_SRC = '2-flug.mp4';
+  var PLACEHOLDER_MS = 6000;   // Standbild-Dauer bis die Player-Karte landet
+  // ---------- SCHNEE-ENDSZENE (Max-Wunsch) ----------
+  // Flocken sammeln sich auf der Oberkante des Players; ab Schwellhoehe kippt ein Klumpen ab.
+  var SNOW = {
+    enabled: true,              // CONFIG-Schalter: Schnee-Endszene an/aus
+    flakesDesktop: 130,         // max. gleichzeitige Flocken (Desktop)
+    flakesMobile: 60,           // mobil begrenzt
+    capMax: 16,                 // Hauben-Hoehe in px, ab der ein Klumpen abkippt
+    clumpMin: 9                 // Mindest-Haubenhoehe fuer natuerliches Abkippen
+  };
   var OPEN_ANGLE = 2.96;  // ~170 Grad
   var CARD_W = 905, CARD_H = 1600;
   var THICK = 0.055;      // Materialstaerke der Karte (dicke Kartonage)
@@ -26,16 +36,15 @@
   var qs = new URLSearchParams(location.search);
   var recipient = (qs.get('name') || 'Julia').replace(/\s+/g, ' ').trim().slice(0, 24) || 'Julia';
   var debugState = qs.get('state');
-  var debugScene = qs.has('scene') ? parseFloat(qs.get('scene')) : null;
   var debugT = qs.has('t') ? parseFloat(qs.get('t')) : null;
 
   // ---------- DOM ----------
   var stage = document.getElementById('stage');
   var glCanvas = document.getElementById('gl');
   var fallback = document.getElementById('fallback');
-  var sceneEl = document.getElementById('scene');
-  var sceneCam = document.getElementById('sceneCam');
-  var snowCv = document.getElementById('snow');
+  var sceneImg = document.getElementById('sceneImg');
+  var flightVideo = document.getElementById('flight');
+  var snowFxCv = document.getElementById('snowFx');
   var cardname = document.getElementById('cardname');
   var cardnameText = document.getElementById('cardnameText');
   var veil = document.getElementById('veil');
@@ -334,11 +343,6 @@
     var dt = Math.min(0.05, (now - lastFrame) / 1000 || 0.016);
     lastFrame = now;
 
-    if (phase === 'flight' && frozenSceneT === null) {
-      var st = clamp((now - sceneT0) / SCENE_MS, 0, 1);
-      setScene(st);
-      if (st >= 1) landCard();
-    }
     if (phase === 'opening' || frozenP !== null) {
       var p = frozenP !== null ? frozenP : clamp((now - openStart) / OPEN_MS, 0, 1);
       var e = easeInOutCubic(p);
@@ -357,12 +361,11 @@
       cardname.style.filter = kn > 0.01 ? 'blur(' + ((1 - kn) * 14).toFixed(1) + 'px)' : '';
       cardname.style.visibility = kn > 0.01 ? 'visible' : 'hidden';
       // Welt dahinter blendet synchron zur Oeffnung ein
-      sceneEl.style.opacity = smooth(p * 2.2);
+      sceneImg.style.opacity = smooth(p * 2.2);
       if (p > 0.8) glCanvas.style.opacity = Math.max(0, 1 - (p - 0.8) / 0.2);
       if (p >= 1 && frozenP === null) endOpening();
     }
     if (phase !== 'flight' && phase !== 'landing' && phase !== 'player') renderFrame(dt);
-    drawSnow(now);
   }
 
   function startLoop() {
@@ -376,109 +379,232 @@
   }
 
   // ============================================================
-  //  Szenen-Flug: Straße wird waehrend des Flugs gezeichnet
-  //  (Ebenen aus Max' Aquarell, Strich-Reveal -> Farb-Fade, Turm zuletzt)
+  //  Flug: Video (Max' KI-Clip) oder Standbild-Platzhalter
   // ============================================================
-  var LAYERS = [
-    // z = Tiefe in px (Perspektive 1000), s = Strich-Start, c = Farb-Start (Anteile)
-    { id: 'ground',      z: 750,  s: 0.04, c: 0.24 },
-    { id: 'people',      z: 200,  s: 0.08, c: 0.28 },
-    { id: 'awning',      z: 600,  s: 0.14, c: 0.34 },
-    { id: 'trees',       z: 400,  s: 0.20, c: 0.40 },
-    { id: 'buildings-l', z: 1000, s: 0.28, c: 0.48 },
-    { id: 'buildings-r', z: 1000, s: 0.33, c: 0.52 },
-    { id: 'sky',         z: 1500, s: 0.40, c: 0.58 },
-    { id: 'tower',       z: 1350, s: 0.64, c: 0.84 }
-  ];
-  var sceneT0 = 0, frozenSceneT = null;
-  var sceneDone = false, snowOn = false, snowP = [];
+  var videoOK = false;
 
-  // Ebenen einmalig mit Tiefe versetzt (Skalenausgleich fuer die Perspektive)
-  LAYERS.forEach(function (l) {
-    var el = document.getElementById('sl-' + l.id);
-    l.el = el;
-    l.stroke = el.querySelector('.sl-stroke');
-    l.color = el.querySelector('.sl-color');
-    var k = (1000 + l.z) / 1000;
-    el.style.transform = 'translateZ(' + (-l.z) + 'px) scale(' + k.toFixed(4) + ')';
+  flightVideo.addEventListener('playing', function () {
+    videoOK = true;
+    if (phase === 'opening' || phase === 'flight') flightVideo.style.opacity = 1;
+  });
+  flightVideo.addEventListener('error', function () { videoOK = false; });
+  // Letztes Videobild (fertige Szene) bleibt stehen, Player-Karte landet
+  flightVideo.addEventListener('ended', function () {
+    if (phase === 'flight') landCard();
+  });
+  flightVideo.addEventListener('stalled', function () {
+    // haengt das Video, landet die Karte trotzdem (Watchdog laeuft)
   });
 
-  function setScene(t) {
-    // t: 0..1 entlang SCENE_MS
-    LAYERS.forEach(function (l) {
-      var sp = clamp((t - l.s) / STROKE_DUR, 0, 1);   // Strich-Fortschritt
-      var cp = clamp((t - l.c) / COLOR_DUR, 0, 1);    // Farb-Fortschritt
-      l.stroke.style.setProperty('--p', sp.toFixed(4));
-      l.stroke.style.opacity = sp > 0 ? 1 : 0;
-      l.color.style.opacity = cp;
-      l.color.style.filter = cp > 0 && cp < 1 ? 'blur(' + ((1 - cp) * 7).toFixed(1) + 'px)' : (cp >= 1 ? '' : 'blur(7px)');
-    });
-    // leichter Kamera-Flug durch die Strasse
-    var cz = CAM_Z * easeInOutCubic(clamp(t, 0, 1));
-    sceneCam.style.transform = 'translateZ(' + cz.toFixed(1) + 'px)';
-    if (t >= 0.93) startSnow();
-    if (t >= 1) sceneDone = true;
+  // ============================================================
+  //  Schnee-Endszene: Flocken -> Haube auf dem Player -> abkippende Klumpen
+  //  Eigenes minimales Partikelsystem (kein Framework). Eigener rAF-Loop,
+  //  weil die Hauptschleife in der Flugphase steht. Pausiert bei verstecktem Tab.
+  // ============================================================
+  var snowRaf = null, snowCtx = null, snowOn = false;
+  var flakes = [], clumps = [], pile = null;
+  var cardRect = null, cardRectT = 0;
+  var BIN = 7;                 // Breite eines Hauben-Bins in px
+
+  function snowResize() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var r = snowFxCv.getBoundingClientRect();
+    snowFxCv.width = Math.max(1, Math.round(r.width * dpr));
+    snowFxCv.height = Math.max(1, Math.round(r.height * dpr));
+    snowCtx = snowFxCv.getContext('2d');
+    snowCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pile = null; // Hauben-Bins beim Resize neu aufsetzen
   }
 
-  function resetScene() {
-    LAYERS.forEach(function (l) {
-      l.stroke.style.setProperty('--p', '0');
-      l.stroke.style.opacity = 0;
-      l.color.style.opacity = 0;
-      l.color.style.filter = 'blur(7px)';
-    });
-    sceneCam.style.transform = 'translateZ(0px)';
-    sceneEl.style.opacity = 0;
-    sceneDone = false;
-    stopSnow();
+  function flakeCount() {
+    var mobile = Math.min(window.innerWidth, window.innerHeight) < 620;
+    return mobile ? SNOW.flakesMobile : SNOW.flakesDesktop;
   }
 
-  // Schnee erst in der fertigen Endszene
-  function startSnow() {
-    if (snowOn) return;
-    snowOn = true;
-    var w = stage.clientWidth, h = stage.clientHeight;
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    snowCv.width = w * dpr; snowCv.height = h * dpr;
-    snowCv.style.width = w + 'px'; snowCv.style.height = h + 'px';
-    snowP = [];
-    for (var i = 0; i < 90; i++) {
-      snowP.push({
-        x: Math.random() * w, y: Math.random() * h,
-        r: 0.8 + Math.random() * 1.8,
-        v: 14 + Math.random() * 22,
-        drift: 6 + Math.random() * 10,
-        ph: Math.random() * 6.28
-      });
+  function spawnFlake(anywhere) {
+    var r = snowFxCv.getBoundingClientRect();
+    return {
+      x: Math.random() * r.width,
+      y: anywhere ? Math.random() * r.height : -6 - Math.random() * 30,
+      vy: 26 + Math.random() * 34,          // Fallgeschwindigkeit px/s
+      drift: 10 + Math.random() * 22,       // seitliche Drift-Amplitude
+      phase: Math.random() * Math.PI * 2,
+      size: 1.1 + Math.random() * 1.9
+    };
+  }
+
+  function ensurePile() {
+    if (!cardRect) return;
+    var n = Math.max(4, Math.ceil(cardRect.width / BIN));
+    if (!pile || pile.length !== n) {
+      pile = new Array(n);
+      for (var i = 0; i < n; i++) pile[i] = 0;
     }
   }
-  function stopSnow() {
-    snowOn = false;
-    var c = snowCv.getContext('2d');
-    if (c) c.clearRect(0, 0, snowCv.width, snowCv.height);
+
+  function refreshCardRect(now) {
+    if (now - cardRectT > 400) {
+      cardRectT = now;
+      var el = document.getElementById('card');
+      var cr = el.getBoundingClientRect();
+      var stageR = stage.getBoundingClientRect();
+      cardRect = {
+        left: cr.left - stageR.left,
+        top: cr.top - stageR.top,
+        width: cr.width,
+        height: cr.height
+      };
+      ensurePile();
+    }
   }
+
+  function deposit(x) {
+    if (!pile || !cardRect) return false;
+    if (x < cardRect.left || x > cardRect.left + cardRect.width) return false;
+    var i = Math.min(pile.length - 1, Math.max(0, Math.floor((x - cardRect.left) / BIN)));
+    pile[i] += 0.55;
+    // etwas zu den Nachbarn verteilen -> weiche Haube
+    if (i > 0) pile[i - 1] += 0.18;
+    if (i < pile.length - 1) pile[i + 1] += 0.18;
+    return true;
+  }
+
+  // Abkippen: lokale Erhebung loest sich als Klumpen und faellt mit Gravitation
+  function maybeTip() {
+    if (!pile || !cardRect) return;
+    for (var i = 1; i < pile.length - 1; i++) {
+      var h = pile[i];
+      if (h >= SNOW.capMax || (h > SNOW.clumpMin && Math.random() < 0.002)) {
+        var slope = pile[i - 1] - pile[i + 1]; // Richtung des Gefaelles
+        var take = Math.min(h, 6 + Math.random() * 6);
+        pile[i] -= take;
+        if (pile[i - 1] > 1) pile[i - 1] -= take * 0.25;
+        if (pile[i + 1] > 1) pile[i + 1] -= take * 0.25;
+        clumps.push({
+          x: cardRect.left + i * BIN + BIN / 2,
+          y: cardRect.top - Math.max(0, h - take) - 3,
+          r: 2.5 + take * 0.45,
+          vx: (slope >= 0 ? -1 : 1) * (14 + Math.random() * 22),
+          vy: 12,
+          rot: Math.random() * Math.PI,
+          vr: (Math.random() - 0.5) * 3
+        });
+      }
+    }
+  }
+
+  function snowStep(now, dt) {
+    var r = snowFxCv.getBoundingClientRect();
+    var W = r.width, H = r.height;
+    snowCtx.clearRect(0, 0, W, H);
+
+    // Flocken bewegen
+    for (var i = 0; i < flakes.length; i++) {
+      var f = flakes[i];
+      f.phase += dt * 0.9;
+      f.x += Math.sin(f.phase) * f.drift * dt;
+      f.y += f.vy * dt;
+
+      var landed = false;
+      if (pile && cardRect && f.x >= cardRect.left && f.x <= cardRect.left + cardRect.width) {
+        var bi = Math.min(pile.length - 1, Math.max(0, Math.floor((f.x - cardRect.left) / BIN)));
+        var surf = cardRect.top - pile[bi] - 1;
+        if (f.y >= surf) landed = true;
+      }
+      if (landed) { deposit(f.x); flakes[i] = spawnFlake(false); continue; }
+      if (f.y > H + 6) { flakes[i] = spawnFlake(false); continue; }
+
+      snowCtx.beginPath();
+      snowCtx.arc(f.x, f.y, f.size, 0, Math.PI * 2);
+      snowCtx.fillStyle = 'rgba(255,255,255,0.85)';
+      snowCtx.fill();
+    }
+
+    maybeTip();
+
+    // Klumpen: Gravitation, leichte Rotation, unten ausblenden
+    for (var j = clumps.length - 1; j >= 0; j--) {
+      var cl = clumps[j];
+      cl.vy += 620 * dt;   // Gravitation px/s^2
+      cl.y += cl.vy * dt;
+      cl.x += cl.vx * dt;
+      cl.rot += cl.vr * dt;
+      var fade = 1;
+      if (cardRect && cl.y > cardRect.top + 10) fade = Math.max(0, 1 - (cl.y - cardRect.top - 10) / 90);
+      if (fade <= 0 || cl.y > H + 20) { clumps.splice(j, 1); continue; }
+      snowCtx.save();
+      snowCtx.translate(cl.x, cl.y);
+      snowCtx.rotate(cl.rot);
+      snowCtx.globalAlpha = fade;
+      snowCtx.beginPath();
+      snowCtx.arc(0, 0, cl.r, 0, Math.PI * 2);
+      snowCtx.arc(cl.r * 0.6, -cl.r * 0.35, cl.r * 0.7, 0, Math.PI * 2);
+      snowCtx.fillStyle = 'rgba(255,255,255,0.95)';
+      snowCtx.fill();
+      snowCtx.restore();
+      snowCtx.globalAlpha = 1;
+    }
+
+    // Haube auf der Player-Oberkante zeichnen (weiche Kuppe)
+    if (pile && cardRect && cardRect.width > 0) {
+      snowCtx.beginPath();
+      snowCtx.moveTo(cardRect.left, cardRect.top + 2);
+      for (var b = 0; b < pile.length; b++) {
+        var bx = cardRect.left + b * BIN + BIN / 2;
+        var by = cardRect.top + 1 - pile[b];
+        if (b === 0) snowCtx.lineTo(bx, by);
+        else snowCtx.quadraticCurveTo(cardRect.left + b * BIN, cardRect.top + 1 - pile[b - 1], bx, by);
+      }
+      snowCtx.lineTo(cardRect.left + cardRect.width, cardRect.top + 2);
+      snowCtx.closePath();
+      snowCtx.fillStyle = 'rgba(255,255,255,0.96)';
+      snowCtx.fill();
+    }
+  }
+
   var snowLast = 0;
-  function drawSnow(now) {
-    if (!snowOn) return;
-    var c = snowCv.getContext('2d');
-    if (!c) return;
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var w = snowCv.width / dpr, h = snowCv.height / dpr;
+  function snowLoop(now) {
+    if (!snowOn) { snowRaf = null; return; }
+    snowRaf = requestAnimationFrame(snowLoop);
     var dt = Math.min(0.05, (now - snowLast) / 1000 || 0.016);
     snowLast = now;
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    c.clearRect(0, 0, w, h);
-    c.fillStyle = 'rgba(255,253,250,.85)';
-    for (var i = 0; i < snowP.length; i++) {
-      var f = snowP[i];
-      f.y += f.v * dt;
-      f.x += Math.sin(now / 1400 + f.ph) * f.drift * dt;
-      if (f.y > h + 4) { f.y = -4; f.x = Math.random() * w; }
-      c.beginPath();
-      c.arc(f.x, f.y, f.r, 0, 6.283);
-      c.fill();
-    }
+    refreshCardRect(now);
+    snowStep(now, dt);
   }
+
+  function startSnow() {
+    if (!SNOW.enabled || snowOn) return;
+    snowOn = true;
+    snowResize();
+    var want = flakeCount();
+    flakes = [];
+    for (var i = 0; i < want; i++) flakes.push(spawnFlake(true));
+    clumps = [];
+    snowLast = performance.now();
+    snowRaf = requestAnimationFrame(snowLoop);
+  }
+
+  function stopSnow() {
+    snowOn = false;
+    if (snowRaf !== null) { cancelAnimationFrame(snowRaf); snowRaf = null; }
+    if (snowCtx) {
+      var r = snowFxCv.getBoundingClientRect();
+      snowCtx.clearRect(0, 0, r.width, r.height);
+    }
+    flakes = []; clumps = []; pile = null;
+  }
+
+  // Pausieren bei verstecktem Tab
+  document.addEventListener('visibilitychange', function () {
+    if (!SNOW.enabled) return;
+    if (document.hidden) {
+      if (snowRaf !== null) { cancelAnimationFrame(snowRaf); snowRaf = null; }
+    } else if (snowOn && snowRaf === null) {
+      snowLast = performance.now();
+      snowRaf = requestAnimationFrame(snowLoop);
+    }
+  });
+  window.addEventListener('resize', function () { if (snowOn) snowResize(); });
 
   // ============================================================
   //  Ablauf
@@ -496,29 +622,51 @@
       if (ap && ap.then) ap.then(function () { audio.pause(); audio.currentTime = 0; audio.muted = false; }, function () { audio.muted = false; });
     } catch (e) { audio.muted = false; }
 
+    // Flug-Video starten (stumm, Inline; fehlt die Datei, bleibt das Standbild)
+    try {
+      var fv = flightVideo.play();
+      if (fv && fv.catch) fv.catch(function () {});
+    } catch (e) {}
+
     if (renderer) {
       swayOn = false;
       glCanvas.style.opacity = 1;
       openStart = performance.now();
     } else {
-      // Fallback ohne WebGL: statische Karte ausblenden, fertige Szene direkt zeigen
+      // Fallback ohne WebGL: statische Karte ausblenden, Szene direkt zeigen
       fallback.style.transition = 'opacity .8s ease';
       fallback.style.opacity = 0;
       cardname.style.opacity = 0;
       cardname.style.visibility = 'hidden';
-      sceneEl.style.opacity = 1;
-      setScene(1);
+      sceneImg.style.opacity = 1;
+      startSnow();
       clearTimeout(flightTimer);
-      flightTimer = setTimeout(landCard, 900);
+      flightTimer = setTimeout(landCard, PLACEHOLDER_MS);
     }
   }
 
   function endOpening() {
     phase = 'flight';
     glCanvas.style.opacity = 0;
-    sceneEl.style.opacity = 1;
-    sceneT0 = performance.now();
-    // Loop laeuft weiter: sie treibt die Szenen-Zeitleiste
+    sceneImg.style.opacity = 1;
+    stopLoop();
+    startSnow();
+    clearTimeout(flightTimer);
+    flightTimer = setTimeout(flightWatchdog, PLACEHOLDER_MS);
+  }
+
+  // Watchdog: bei Video landet 'ended' frueher; Standbild oder Video-Haenger -> Timer.
+  // Laeuft das Video noch, wird der Timer auf das Restende verlaengert.
+  function flightWatchdog() {
+    if (phase !== 'flight') return;
+    if (videoOK && !flightVideo.paused && !flightVideo.ended &&
+        isFinite(flightVideo.duration) && flightVideo.duration > 0 &&
+        flightVideo.currentTime < flightVideo.duration - 0.4) {
+      flightTimer = setTimeout(flightWatchdog,
+        (flightVideo.duration - flightVideo.currentTime) * 1000 + 1200);
+      return;
+    }
+    landCard();
   }
 
   function landCard() {
@@ -540,7 +688,11 @@
     clearTimeout(audioTimer);
     clearTimeout(flightTimer);
     audio.pause(); audio.currentTime = 0; audio.muted = false;
-    resetScene();
+    stopSnow();
+    flightVideo.pause();
+    try { flightVideo.currentTime = 0; } catch (e) {}
+    flightVideo.style.opacity = 0;
+    sceneImg.style.opacity = 0;
     cardname.style.opacity = 1;
     cardname.style.filter = '';
     cardname.style.visibility = 'visible';
@@ -657,29 +809,16 @@
       swayOn = false;
       cardname.style.opacity = 0;
       cardname.style.visibility = 'hidden';
-      sceneEl.style.opacity = 1;
-      setScene(1);
-    }
-    if (debugScene !== null && !isNaN(debugScene)) {
-      // Szene eingefroren (Flugmitte/Endzustand), Karte weg
-      if (renderer) { stopLoop(); glCanvas.style.opacity = 0; }
-      else fallback.style.opacity = 0;
-      cardname.style.opacity = 0;
-      cardname.style.visibility = 'hidden';
-      taplayer.classList.add('is-hidden');
-      sceneEl.style.opacity = 1;
-      phase = 'flight';
-      frozenSceneT = clamp(debugScene, 0, 1);
-      setScene(frozenSceneT);
+      sceneImg.style.opacity = 1;
     }
     if (debugState === 'player') {
       if (renderer) { stopLoop(); glCanvas.style.opacity = 0; }
       else fallback.style.opacity = 0;
       cardname.style.opacity = 0;
       cardname.style.visibility = 'hidden';
-      sceneEl.style.opacity = 1;
-      setScene(1);
+      sceneImg.style.opacity = 1;
       phase = 'flight';
+      startSnow();
       veil.style.transition = 'none';
       card.style.transition = 'none';
       taplayer.classList.add('is-hidden');

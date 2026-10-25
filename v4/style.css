@@ -23,33 +23,26 @@ body {
   background: #22306E;
 }
 
-/* --- Szenen-Flug: Strasse wird beim Oeffnen gezeichnet --- */
+/* --- Flug: Standbild (Platzhalter/Poster) + Video-Slot, Vollbild-Cover --- */
 .scene {
   position: absolute; inset: 0; z-index: 1;
-  background: #f4ebe4;
-  perspective: 1000px;
-  perspective-origin: 50% 50%;
-  opacity: 0; pointer-events: none;
+  background: #10121a;
+  overflow: hidden;
+  pointer-events: none;
 }
-.scene-cam {
-  position: absolute; inset: 0;
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-.sl { position: absolute; inset: 0; }
-.sl img {
+#sceneImg, #flight {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; object-position: 50% 40%;
+  object-fit: cover;
+  opacity: 0;
   pointer-events: none; user-select: none;
 }
-.sl-stroke {
-  --p: 0;
-  opacity: 0;
-  -webkit-mask-image: linear-gradient(to top, #000 calc((var(--p) * 112%) - 12%), transparent calc(var(--p) * 112%));
-  mask-image: linear-gradient(to top, #000 calc((var(--p) * 112%) - 12%), transparent calc(var(--p) * 112%));
+
+/* --- Endszene: Schnee, der sich auf dem Player sammelt --- */
+#snowFx {
+  position: absolute; inset: 0; z-index: 55;
+  width: 100%; height: 100%;
+  pointer-events: none;
 }
-.sl-color { opacity: 0; }
-.snow { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 
 /* --- Empfaengername: Live-Textebene, wird nie eingebrannt --- */
 .cardname {

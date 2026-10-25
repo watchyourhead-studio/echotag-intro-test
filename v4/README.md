@@ -1,37 +1,46 @@
-# V4 - EchoTag Weihnachtskarte (3D-Gatefold + Zeichen-Flug)
+# V4 - EchoTag Weihnachtskarte (3D-Gatefold + KI-Flugvideo)
 
-Weihnachtsedition der 3D-Klappkarte aus V3, mit Max' Aquarell-Weihnachtsszene
-(Paris, Eiffelturm, rote Markise) als Welt hinter der Karte.
+Weihnachtsedition der 3D-Klappkarte aus V3. Der Flug ist KEIN programmierter
+3D-Flug mehr: Max erzeugt ihn als KI-Video (Kling via Magnific) und legt die
+MP4 einfach in diesen Ordner.
 
 ## Konzept (Max, 25.10.)
 - Kartenfront: NUR eine Farbe (Tiefblau, CONFIG) + Empfaengername.
 - Der Name ist eine Live-Textebene (Jost, DOM) und wird NIEMALS in
   Bild/Video-Material eingebrannt - dasselbe Material gilt fuer alle Empfaenger.
-- Beim Oeffnen: Kamera fliegt leicht durch die Strasse, die Szenen-Elemente
-  werden versetzt/gemischt gezeichnet: erst Striche (Stroke-Reveal von unten),
-  dann Farbe (Fade mit Aquarell-Blur). Der Eiffelturm wird als Letztes fertig.
-- Fertige Szene bleibt stehen, leichter Schnee faellt, Player-Karte landet,
-  Sprachnachricht startet.
+- Beim Oeffnen: Gatefold aus V3, dahinter Vollbild-Video (responsive, Cover).
+- PLATZHALTER bis Max' Video fertig ist: sein Paris-Aquarell als Standbild
+  (scene.jpg). Das Video ersetzt es ohne Code-Aenderung (siehe Video-Slot).
+- Nach Video-Ende: letztes Bild (fertige Szene) bleibt stehen, Player-Karte
+  landet, Sprachnachricht startet - Logik wie V3.
+- Endszene: Schneeflocken sammeln sich auf der Oberkante des Players
+  (Haube waechst, ab Schwellhoehe kippt ein Klumpen mit Gravitation ab).
+
+## Video-Slot (Asset-Tausch ohne Code)
+- Datei: 2-flug.mp4 in diesen Ordner legen. Fehlt sie, laeuft automatisch
+  das Standbild scene.jpg (aktueller Zustand).
+- Konstanten zentral oben in app.js: VIDEO_SRC, PLACEHOLDER_MS (Standbild-Dauer),
+  SNOW (enabled / Flockenzahl / Hauben-Schwellwerte), COLORS (Kartenfront etc.).
 
 ## Palette (zentral in app.js COLORS aenderbar)
 - Kartenfront: #22306E (Tiefblau), Name: #F6F1E8 (Creme, Live-Ebene)
-- Szene-Papier: #F4EBE4 (Cremeton aus dem Motiv)
 - Schrift: Jost (fonts/jost-var.woff2, variabel 100-900, OFL)
 
 ## Technik
-- Szene: Max' Aquarell (3106x4160) in 8 Tiefenebenen zerlegt (PIL, harte
-  Masken, Papier-Luecken) als WebP in scene/: sky, tower, buildings-l/r,
-  ground, awning, trees, people - je Farb- und Strich-Version (*-lines.webp).
-- CSS-3D-Perspektive (1000px), Kamera-Dolly 320px waehrend SCENE_MS (6s).
-- Stroke-Reveal per CSS-Mask-Wipe (--p), Farb-Fade mit Blur-Reduktion.
-- Schnee: Canvas-Partikel, startet erst gegen Ende der Zeichenphase.
+- Gatefold/3D-Karte: three.js wie V3, Front per Canvas gebacken (nur Farbe+Grain).
+- Video: muted/playsinline, startet im Tap-Handler (iOS-tauglich), 'ended'
+  loest die Player-Landung aus; Watchdog-Timer faengt Video-Haenger ab.
+- Schnee: eigenes minimales Partikelsystem (Canvas 2D, kein Framework),
+  Hoehenfeld-Haube auf der Player-Bounding-Box, Klumpen mit Gravitation,
+  mobil reduzierte Flockenzahl, pausiert bei verstecktem Tab.
 
 ## Assets
-- scene/*.webp - Ebenen aus Max' Motiv (Farbe + Strich)
+- scene.jpg - Standbild aus Max' Paris-Aquarell (Platzhalter/Poster)
+- 2-flug.mp4 - (kommt von Max) KI-Flugvideo
 - sample-audio.mp3 - Max' Sample-Sprachnachricht (Platzhalter)
 - fonts/jost-var.woff2 - Jost (SIL Open Font License 1.1)
 - lib/three.min.js - three.js r149 (MIT)
 
 ## Debug
 ?name=Anna (Empfaengername, Live-Ebene), ?t=0..1 (Oeffnung einfrieren),
-?scene=0..1 (Szene einfrieren), ?state=open|player, ?auto=1
+?state=open|player, ?auto=1

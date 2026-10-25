@@ -10,20 +10,14 @@
 </head>
 <body>
 <div class="stage" id="stage">
+  <!-- Flug: Video-Slot (Max' KI-Clip) ueber dem Paris-Standbild als Platzhalter/Poster.
+       Spaeter nur 2-flug.mp4 in diesen Ordner legen - kein Code-Eingriff noetig. -->
   <div class="scene" id="scene">
-    <div class="scene-cam" id="sceneCam">
-      <div class="sl" id="sl-sky"><img class="sl-stroke" src="scene/sky-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/sky.webp" alt="" draggable="false"></div>
-      <div class="sl" id="sl-tower"><img class="sl-stroke" src="scene/tower-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/tower.webp" alt="" draggable="false"></div>
-      <div class="sl" id="sl-buildings-r"><img class="sl-stroke" src="scene/buildings-r-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/buildings-r.webp" alt="" draggable="false"></div>
-      <div class="sl" id="sl-buildings-l"><img class="sl-stroke" src="scene/buildings-l-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/buildings-l.webp" alt="" draggable="false"></div>
-      <div class="sl" id="sl-ground"><img class="sl-stroke" src="scene/ground-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/ground.webp" alt="" draggable="false"></div>
-      <div class="sl" id="sl-awning"><img class="sl-stroke" src="scene/awning-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/awning.webp" alt="" draggable="false"></div>
-      <div class="sl" id="sl-trees"><img class="sl-stroke" src="scene/trees-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/trees.webp" alt="" draggable="false"></div>
-      <div class="sl" id="sl-people"><img class="sl-stroke" src="scene/people-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/people.webp" alt="" draggable="false"></div>
-    </div>
-    <canvas class="snow" id="snow"></canvas>
+    <img id="sceneImg" src="scene.jpg" alt="">
+    <video id="flight" muted playsinline preload="auto" poster="scene.jpg" src="2-flug.mp4"></video>
   </div>
   <canvas id="gl" aria-hidden="true"></canvas>
+  <canvas id="snowFx" aria-hidden="true"></canvas>
   <div class="cardname" id="cardname" aria-hidden="true">
     <span class="cn-fuer">Für</span>
     <span class="cn-name" id="cardnameText">Julia</span>
