@@ -26,7 +26,7 @@ body {
 /* --- Flug: Standbild (Platzhalter/Poster) + Video-Slot, Vollbild-Cover --- */
 .scene {
   position: absolute; inset: 0; z-index: 1;
-  background: #10121a;
+  background: transparent; /* kein Deckanstrich: die Karte liegt darunter */
   overflow: hidden;
   pointer-events: none;
 }
