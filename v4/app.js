@@ -205,8 +205,27 @@
     cv.width = im.naturalWidth; cv.height = im.naturalHeight;
     var ctx = cv.getContext('2d');
     ctx.drawImage(im, 0, 0);
+    bakeCreaseAO(ctx, cv.width, cv.height, 0.20);
     roundCorners(ctx, cv.width, cv.height);
     return cv;
+  }
+
+  // Mittelknick: weiche Schattentalka beidseitig des Falzes + feine Lichtkante.
+  // View-unabhaengig gebacken, damit der Knick im geschlossenen Zustand sicher liest.
+  function bakeCreaseAO(ctx, w, h, strength) {
+    var cx = w / 2, gw = w * 0.028;
+    var gL = ctx.createLinearGradient(cx - gw, 0, cx, 0);
+    gL.addColorStop(0, 'rgba(0,0,0,0)');
+    gL.addColorStop(1, 'rgba(24,10,12,' + strength + ')');
+    ctx.fillStyle = gL;
+    ctx.fillRect(cx - gw, 0, gw, h);
+    var gR = ctx.createLinearGradient(cx, 0, cx + gw, 0);
+    gR.addColorStop(0, 'rgba(24,10,12,' + strength + ')');
+    gR.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gR;
+    ctx.fillRect(cx, 0, gw, h);
+    ctx.fillStyle = 'rgba(255,250,238,' + (strength * 0.45).toFixed(3) + ')';
+    ctx.fillRect(cx - Math.max(1, w * 0.0008), 0, Math.max(2, w * 0.0016), h);
   }
 
   // Vorderseite: NUR eine Farbe, kein Motiv, kein eingebrannter Name.
@@ -439,7 +458,7 @@
     var roughT = makeRoughTex(), normT = makeNormalTex();
     var frontMat = new THREE.MeshStandardMaterial({
       map: frontTex, roughness: 1.0, roughnessMap: roughT,
-      normalMap: normT, normalScale: new THREE.Vector2(0.55, 0.55),
+      normalMap: normT, normalScale: new THREE.Vector2(0.7, 0.7),
       metalness: 0, alphaTest: 0.5
     });
     var backMatL = new THREE.MeshStandardMaterial({
@@ -481,7 +500,7 @@
       for (i = 0; i < pos.count; i++) {
         var px = pos.getX(i);
         var u = clamp(L ? px / halfW : -px / halfW, 0, 1);   // 0 = Falz, 1 = Aussenkante
-        var crease = u < 0.07 ? Math.pow(1 - u / 0.07, 2) * 0.018 : 0;
+        var crease = u < 0.09 ? Math.pow(1 - u / 0.09, 2) * 0.032 : 0;
         var bow = Math.sin(Math.PI * u) * 0.010;
         pos.setZ(i, bow - crease);
       }
