@@ -400,11 +400,16 @@
   //  Schnee-Endszene: Flocken -> Haube auf dem Player -> abkippende Klumpen
   //  Eigenes minimales Partikelsystem (kein Framework). Eigener rAF-Loop,
   //  weil die Hauptschleife in der Flugphase steht. Pausiert bei verstecktem Tab.
+  //  Physik der Rundung (Max 08:12): Haube nur auf dem GERADEN Teil der
+  //  Oberkante; Flocken im border-radius-Bereich rutschen der Kurve folgend
+  //  seitlich ab; Klumpen brechen bevorzugt an den Ecken und fallen entlang
+  //  der Rundung.
   // ============================================================
   var snowRaf = null, snowCtx = null, snowOn = false;
-  var flakes = [], clumps = [], pile = null;
+  var flakes = [], clumps = [], sliders = [], pile = null;
   var cardRect = null, cardRectT = 0;
   var BIN = 7;                 // Breite eines Hauben-Bins in px
+  var GRAV = 620;              // Gravitation px/s^2
 
   function snowResize() {
     var dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -426,16 +431,21 @@
     return {
       x: Math.random() * r.width,
       y: anywhere ? Math.random() * r.height : -6 - Math.random() * 30,
-      vy: 26 + Math.random() * 34,          // Fallgeschwindigkeit px/s
-      drift: 10 + Math.random() * 22,       // seitliche Drift-Amplitude
+      vy: 26 + Math.random() * 34,
+      drift: 10 + Math.random() * 22,
       phase: Math.random() * Math.PI * 2,
       size: 1.1 + Math.random() * 1.9
     };
   }
 
+  // gerader Abschnitt der Oberkante (ohne Ecken-Radius)
+  function straightL() { return cardRect.left + cardRect.radius; }
+  function straightR() { return cardRect.left + cardRect.width - cardRect.radius; }
+
   function ensurePile() {
     if (!cardRect) return;
-    var n = Math.max(4, Math.ceil(cardRect.width / BIN));
+    var w = Math.max(10, straightR() - straightL());
+    var n = Math.max(4, Math.ceil(w / BIN));
     if (!pile || pile.length !== n) {
       pile = new Array(n);
       for (var i = 0; i < n; i++) pile[i] = 0;
@@ -447,50 +457,103 @@
       cardRectT = now;
       var el = document.getElementById('card');
       var cr = el.getBoundingClientRect();
+      var cs = getComputedStyle(el);
+      var rad = parseFloat(cs.borderTopLeftRadius) || 0;
+      rad = Math.max(rad, parseFloat(cs.borderTopRightRadius) || 0);
       var stageR = stage.getBoundingClientRect();
       cardRect = {
         left: cr.left - stageR.left,
         top: cr.top - stageR.top,
         width: cr.width,
-        height: cr.height
+        height: cr.height,
+        radius: Math.min(rad, cr.width / 2)
       };
       ensurePile();
     }
   }
 
+  // Kurven-Oberflaeche im Eckenbereich: Kreisbogen des border-radius
+  // Seite: -1 links, +1 rechts. Gibt y der Bogenoberflaeche bei x zurueck.
+  function cornerCurveY(x, side) {
+    var cx = side < 0 ? straightL() : straightR();
+    var dx = side < 0 ? (cx - x) : (x - cx);   // 0 am geraden Ende, R aussen
+    var R = cardRect.radius;
+    if (dx < 0 || dx > R) return null;
+    return cardRect.top + R - Math.sqrt(Math.max(0, R * R - dx * dx));
+  }
+
+  function inCornerZone(x) {
+    if (!cardRect) return 0;
+    if (x >= cardRect.left && x < straightL()) return -1;
+    if (x > straightR() && x <= cardRect.left + cardRect.width) return 1;
+    return 0;
+  }
+
+  // Slider: Partikel/Klumpen, der dem Ecken-Kreisbogen folgt
+  function spawnSlider(x, r, side) {
+    var R = cardRect.radius;
+    var cx = side < 0 ? straightL() : straightR();
+    var dx = Math.max(0, Math.min(R, side < 0 ? cx - x : x - cx));
+    sliders.push({
+      side: side,
+      a: Math.asin(dx / R),          // 0 = oben, PI/2 = seitlich
+      om: 0.6 + Math.random() * 0.5, // Winkelgeschwindigkeit rad/s
+      r: r
+    });
+  }
+
   function deposit(x) {
     if (!pile || !cardRect) return false;
-    if (x < cardRect.left || x > cardRect.left + cardRect.width) return false;
-    var i = Math.min(pile.length - 1, Math.max(0, Math.floor((x - cardRect.left) / BIN)));
+    if (x < straightL() || x > straightR()) return false;
+    var i = Math.min(pile.length - 1, Math.max(0, Math.floor((x - straightL()) / BIN)));
     pile[i] += 0.55;
-    // etwas zu den Nachbarn verteilen -> weiche Haube
     if (i > 0) pile[i - 1] += 0.18;
     if (i < pile.length - 1) pile[i + 1] += 0.18;
     return true;
   }
 
-  // Abkippen: lokale Erhebung loest sich als Klumpen und faellt mit Gravitation
+  // Abkippen: bevorzugt nahe den Ecken; der Klumpen rutscht auf den Bogen
   function maybeTip() {
     if (!pile || !cardRect) return;
-    for (var i = 1; i < pile.length - 1; i++) {
+    var n = pile.length;
+    for (var i = 1; i < n - 1; i++) {
       var h = pile[i];
-      if (h >= SNOW.capMax || (h > SNOW.clumpMin && Math.random() < 0.002)) {
-        var slope = pile[i - 1] - pile[i + 1]; // Richtung des Gefaelles
+      if (h < 2) continue;
+      var edgeDist = Math.min(i, n - 1 - i) / (n / 2);      // 0 = Ecke, 1 = Mitte
+      var edgeBias = 1 + 3 * (1 - edgeDist);                // Ecken kippen 4x so gern
+      var threshold = SNOW.capMax - 4 * (1 - edgeDist);     // Ecken frueher
+      if (h >= threshold || (h > SNOW.clumpMin * 0.7 && Math.random() < 0.0015 * edgeBias)) {
         var take = Math.min(h, 6 + Math.random() * 6);
         pile[i] -= take;
         if (pile[i - 1] > 1) pile[i - 1] -= take * 0.25;
         if (pile[i + 1] > 1) pile[i + 1] -= take * 0.25;
-        clumps.push({
-          x: cardRect.left + i * BIN + BIN / 2,
-          y: cardRect.top - Math.max(0, h - take) - 3,
-          r: 2.5 + take * 0.45,
-          vx: (slope >= 0 ? -1 : 1) * (14 + Math.random() * 22),
-          vy: 12,
-          rot: Math.random() * Math.PI,
-          vr: (Math.random() - 0.5) * 3
-        });
+        var x = straightL() + i * BIN + BIN / 2;
+        var r = 2.5 + take * 0.45;
+        if (edgeDist < 0.35) {
+          // nahe der Ecke: direkt auf den Bogen setzen
+          spawnSlider(i < n / 2 ? straightL() - 1 : straightR() + 1, r, i < n / 2 ? -1 : 1);
+        } else {
+          clumps.push({
+            x: x, y: cardRect.top - Math.max(0, h - take) - 3,
+            r: r,
+            vx: (Math.random() - 0.5) * 20,
+            vy: 12,
+            rot: Math.random() * Math.PI,
+            vr: (Math.random() - 0.5) * 3
+          });
+        }
       }
     }
+  }
+
+  function drawBlob(x, y, r, alpha) {
+    snowCtx.globalAlpha = alpha;
+    snowCtx.beginPath();
+    snowCtx.arc(x, y, r, 0, Math.PI * 2);
+    if (r > 3) snowCtx.arc(x + r * 0.6, y - r * 0.35, r * 0.7, 0, Math.PI * 2);
+    snowCtx.fillStyle = 'rgba(255,255,255,0.95)';
+    snowCtx.fill();
+    snowCtx.globalAlpha = 1;
   }
 
   function snowStep(now, dt) {
@@ -505,14 +568,22 @@
       f.x += Math.sin(f.phase) * f.drift * dt;
       f.y += f.vy * dt;
 
-      var landed = false;
-      if (pile && cardRect && f.x >= cardRect.left && f.x <= cardRect.left + cardRect.width) {
-        var bi = Math.min(pile.length - 1, Math.max(0, Math.floor((f.x - cardRect.left) / BIN)));
-        var surf = cardRect.top - pile[bi] - 1;
-        if (f.y >= surf) landed = true;
+      var done = false;
+      if (cardRect) {
+        var side = inCornerZone(f.x);
+        if (side !== 0) {
+          // Eckenzone: auf der Kurve landen -> seitlich abrutschen
+          var cy = cornerCurveY(f.x, side);
+          if (cy !== null && f.y >= cy - 1) {
+            spawnSlider(f.x, f.size, side);
+            done = true;
+          }
+        } else if (pile && f.x >= straightL() && f.x <= straightR()) {
+          var bi = Math.min(pile.length - 1, Math.max(0, Math.floor((f.x - straightL()) / BIN)));
+          if (f.y >= cardRect.top - pile[bi] - 1) { deposit(f.x); done = true; }
+        }
       }
-      if (landed) { deposit(f.x); flakes[i] = spawnFlake(false); continue; }
-      if (f.y > H + 6) { flakes[i] = spawnFlake(false); continue; }
+      if (done || f.y > H + 6) { flakes[i] = spawnFlake(false); continue; }
 
       snowCtx.beginPath();
       snowCtx.arc(f.x, f.y, f.size, 0, Math.PI * 2);
@@ -522,40 +593,70 @@
 
     maybeTip();
 
-    // Klumpen: Gravitation, leichte Rotation, unten ausblenden
+    // Slider: entlang des Kreisbogens beschleunigen, an der Seite abloesen
+    for (var s = sliders.length - 1; s >= 0; s--) {
+      var sl = sliders[s];
+      var R = cardRect ? cardRect.radius : 20;
+      sl.om += (GRAV * Math.sin(sl.a) / R) * dt;   // tangentiale Beschleunigung
+      sl.a += sl.om * dt;
+      var cx = sl.side < 0 ? straightL() : straightR();
+      var px = cx - sl.side * R * Math.sin(sl.a);
+      var py = cardRect.top + R - R * Math.cos(sl.a);
+      if (sl.a >= Math.PI / 2 * 0.98) {
+        // am Ende der Rundung: als freier Klumpen weiterfallen
+        var v = sl.om * R;
+        clumps.push({
+          x: px, y: py, r: sl.r,
+          vx: -sl.side * Math.max(6, v * 0.15),
+          vy: Math.max(30, v),
+          rot: 0, vr: (Math.random() - 0.5) * 3
+        });
+        sliders.splice(s, 1);
+        continue;
+      }
+      drawBlob(px, py, sl.r, 0.95);
+    }
+
+    // Klumpen: Gravitation, Rotation, ggf. auf die Rundung umgreifen
     for (var j = clumps.length - 1; j >= 0; j--) {
       var cl = clumps[j];
-      cl.vy += 620 * dt;   // Gravitation px/s^2
+      cl.vy += GRAV * dt;
       cl.y += cl.vy * dt;
       cl.x += cl.vx * dt;
       cl.rot += cl.vr * dt;
+      if (cardRect) {
+        var cside = inCornerZone(cl.x);
+        if (cside !== 0 && cl.y < cardRect.top + cardRect.radius) {
+          var cy2 = cornerCurveY(cl.x, cside);
+          if (cy2 !== null && cl.y >= cy2 - 2) {
+            spawnSlider(cl.x, cl.r, cside);
+            clumps.splice(j, 1);
+            continue;
+          }
+        }
+      }
       var fade = 1;
       if (cardRect && cl.y > cardRect.top + 10) fade = Math.max(0, 1 - (cl.y - cardRect.top - 10) / 90);
       if (fade <= 0 || cl.y > H + 20) { clumps.splice(j, 1); continue; }
+      clumps[j].rot = cl.rot;
       snowCtx.save();
       snowCtx.translate(cl.x, cl.y);
       snowCtx.rotate(cl.rot);
-      snowCtx.globalAlpha = fade;
-      snowCtx.beginPath();
-      snowCtx.arc(0, 0, cl.r, 0, Math.PI * 2);
-      snowCtx.arc(cl.r * 0.6, -cl.r * 0.35, cl.r * 0.7, 0, Math.PI * 2);
-      snowCtx.fillStyle = 'rgba(255,255,255,0.95)';
-      snowCtx.fill();
+      drawBlob(0, 0, cl.r, fade);
       snowCtx.restore();
-      snowCtx.globalAlpha = 1;
     }
 
-    // Haube auf der Player-Oberkante zeichnen (weiche Kuppe)
+    // Haube: nur auf dem geraden Abschnitt der Oberkante
     if (pile && cardRect && cardRect.width > 0) {
       snowCtx.beginPath();
-      snowCtx.moveTo(cardRect.left, cardRect.top + 2);
+      snowCtx.moveTo(straightL(), cardRect.top + 2);
       for (var b = 0; b < pile.length; b++) {
-        var bx = cardRect.left + b * BIN + BIN / 2;
+        var bx = straightL() + b * BIN + BIN / 2;
         var by = cardRect.top + 1 - pile[b];
         if (b === 0) snowCtx.lineTo(bx, by);
-        else snowCtx.quadraticCurveTo(cardRect.left + b * BIN, cardRect.top + 1 - pile[b - 1], bx, by);
+        else snowCtx.quadraticCurveTo(straightL() + b * BIN, cardRect.top + 1 - pile[b - 1], bx, by);
       }
-      snowCtx.lineTo(cardRect.left + cardRect.width, cardRect.top + 2);
+      snowCtx.lineTo(straightR(), cardRect.top + 2);
       snowCtx.closePath();
       snowCtx.fillStyle = 'rgba(255,255,255,0.96)';
       snowCtx.fill();
@@ -579,7 +680,7 @@
     var want = flakeCount();
     flakes = [];
     for (var i = 0; i < want; i++) flakes.push(spawnFlake(true));
-    clumps = [];
+    clumps = []; sliders = [];
     snowLast = performance.now();
     snowRaf = requestAnimationFrame(snowLoop);
   }
@@ -591,7 +692,7 @@
       var r = snowFxCv.getBoundingClientRect();
       snowCtx.clearRect(0, 0, r.width, r.height);
     }
-    flakes = []; clumps = []; pile = null;
+    flakes = []; clumps = []; sliders = []; pile = null;
   }
 
   // Pausieren bei verstecktem Tab
