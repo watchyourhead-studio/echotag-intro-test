@@ -753,8 +753,10 @@
       if (ap && ap.then) ap.then(function () { audio.pause(); audio.currentTime = 0; audio.muted = false; }, function () { audio.muted = false; });
     } catch (e) { audio.muted = false; }
 
-    // Flug-Video starten (stumm, Inline; fehlt die Datei, bleibt das Standbild)
+    // Flug-Video mit Ton starten (User-Geste durch Antippen; fehlt die Datei, bleibt das Standbild)
     try {
+      flightVideo.muted = false;
+      flightVideo.volume = 1;
       var fv = flightVideo.play();
       if (fv && fv.catch) fv.catch(function () {});
     } catch (e) {}

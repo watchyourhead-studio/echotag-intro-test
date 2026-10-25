@@ -28,15 +28,21 @@ MP4 einfach in diesen Ordner.
 
 ## Technik
 - Gatefold/3D-Karte: three.js wie V3, Front per Canvas gebacken (nur Farbe+Grain).
-- Video: muted/playsinline, startet im Tap-Handler (iOS-tauglich), 'ended'
-  loest die Player-Landung aus; Watchdog-Timer faengt Video-Haenger ab.
+- Video: Ton an, playsinline, startet im Tap-Handler (User-Geste, iOS-tauglich),
+  'ended' loest die Player-Landung aus (Videolaenge steuert das Timing);
+  Watchdog-Timer faengt Video-Haenger ab. Letzter Frame bleibt stehen.
 - Schnee: eigenes minimales Partikelsystem (Canvas 2D, kein Framework),
   Hoehenfeld-Haube auf der Player-Bounding-Box, Klumpen mit Gravitation,
   mobil reduzierte Flockenzahl, pausiert bei verstecktem Tab.
 
 ## Assets
-- scene.jpg - Standbild aus Max' Paris-Aquarell (Platzhalter/Poster)
-- 2-flug.mp4 - (kommt von Max) KI-Flugvideo
+- scene.jpg - Standbild aus Max' Paris-Aquarell (Poster/Fallback)
+- 2-flug.mp4 - Max' KI-Flugvideo (8s, Kling via Magnific), Originalton ersetzt durch Mix:
+  Musik "Christmas Lullaby" (Michael Ramir C., Mixkit Stock Music Free License,
+  mixkit.co, kostenlos auch kommerziell, keine Namensnennung nötig) leise darunter,
+  Zeichengeräusche "Writing with a pen on paper" / "Short pencil writing" /
+  "Writing scribble on paper" (Mixkit Stock SFX Free License) passend zu den
+  Malephasen platziert, Fade-out am Ende
 - sample-audio.mp3 - Max' Sample-Sprachnachricht (Platzhalter)
 - fonts/jost-var.woff2 - Jost (SIL Open Font License 1.1)
 - lib/three.min.js - three.js r149 (MIT)
