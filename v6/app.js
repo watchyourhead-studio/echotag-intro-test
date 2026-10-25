@@ -221,39 +221,88 @@
     var ctx = cv.getContext('2d');
     ctx.drawImage(img, 0, 0, cv.width, cv.height);
     if (!grainPat) makeGrain(ctx);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = grainPat;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.globalAlpha = 1;
+    roundCorners(ctx, cv.width, cv.height);   // Ecken wie echte Grusskarte (Max 14:13)
 
-    // Empfaengername wie eingeDRUCKT (Max 14:00), Technik aus v3: Text auf
-    // separater Flaeche, Artwork weich in die Buchstaben mischen, auf Textform
-    // zurueckschneiden. Zur Laufzeit gebacken (Canvas-Textur pro Name) - kein
-    // statisches Asset mit Name, klappt mit den Fluegeln auf (Textur splittet am Falz).
+    // Druck als zwei getrennte Ebenen (Max 15:03): "closed" durchgehend mittig,
+    // "open" mit dem Falz in einer Buchstabenluecke (v2-Mechanik: der Falz trifft
+    // keinen Buchstaben, jede Haelfte klappt mit ganzen Lettern auf). Der Morph
+    // laeuft in den ersten ~250ms der Oeffnung, geschlossen steht immer die
+    // saubere Durchgehend-Version.
+    return { art: cv, textClosed: bakeTextLayer(img, name, false), textOpen: bakeTextLayer(img, name, true) };
+  }
+
+  // Buchstaben-Layout: optional rueckt der Buchstabe, den der Falz schneiden
+  // wuerde, komplett auf die Seite, auf der sein Zentrum liegt; alle Buchstaben
+  // auf dieser Seite ruecken mit. Kein zerrissener Buchstabe, nur ein schmaler
+  // Zwischenraum genau am Falz.
+  function layoutText(ctx, text, cx, spacing, forOpen, foldX, margin) {
+    var chars = text.split('');
+    var ws = chars.map(function (ch) { return ctx.measureText(ch).width; });
+    var total = ws.reduce(function (a, b) { return a + b; }, 0) + spacing * (chars.length - 1);
+    var x = cx - total / 2, pos = [], i, j;
+    for (i = 0; i < chars.length; i++) { pos.push({ ch: chars[i], x: x, w: ws[i] }); x += ws[i] + spacing; }
+    if (forOpen) {
+      for (i = 0; i < pos.length; i++) {
+        var g = pos[i];
+        if (foldX > g.x + 0.5 && foldX < g.x + g.w - 0.5) {
+          if (g.x + g.w / 2 <= foldX) {
+            var dL = (g.x + g.w) - (foldX - margin);
+            for (j = 0; j <= i; j++) pos[j].x -= dL;
+          } else {
+            var dR = (foldX + margin) - g.x;
+            for (j = i; j < pos.length; j++) pos[j].x += dR;
+          }
+          break;
+        }
+      }
+    }
+    return pos;
+  }
+
+  // Druckebene (transparent, nur Text) mit dem v3-Print-Finish: Weinrot,
+  // Artwork weich in die Buchstaben gemischt, auf Textform geschnitten.
+  function bakeTextLayer(img, name, forOpen) {
+    var S = 2;
+    var foldX = CARD_W * S / 2;
     var tCv = document.createElement('canvas');
-    tCv.width = cv.width; tCv.height = cv.height;
+    tCv.width = CARD_W * S; tCv.height = CARD_H * S;
     var tCtx = tCv.getContext('2d');
     tCtx.fillStyle = '#7C1D25';
     tCtx.textAlign = 'left';
     tCtx.textBaseline = 'alphabetic';
 
-    // Text mittig und am Stueck, Druck laeuft ueber den Falz (Max 14:20, wie v2)
-    var FOLD_X = tCv.width / 2;
-
-    // "FÜR" (Groesse wie die fruehere Live-Ebene)
-    var fuerSize = 26 * S;
-    var fuerSpacing = 8 * S;
-    tCtx.font = '500 ' + fuerSize + 'px Jost';
-    drawSpaced(tCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing);
-
-    // Name, auf Kartenbreite passend (Groesse wie die fruehere Live-Ebene)
+    var fuerSize = 26 * S, fuerSpacing = 8 * S;
+    var etSize = 20 * S, etSpacing = 9 * S;
     var label = name.toUpperCase();
     var size = 79 * S;
     var maxW = tCv.width * 0.78;
+
+    var items = [];
+    tCtx.font = '500 ' + fuerSize + 'px Jost';
+    items.push({ font: tCtx.font, pos: layoutText(tCtx, 'FÜR', foldX, fuerSpacing, forOpen, foldX, 8 * S), y: 738 * S });
     tCtx.font = '600 ' + size + 'px Jost';
-    while (tCtx.measureText(label).width > maxW && size > 16 * S) {
+    var probe = label.split('').map(function (ch) { return tCtx.measureText(ch).width; });
+    var probeTotal = probe.reduce(function (a, b) { return a + b; }, 0);
+    while (probeTotal > maxW && size > 16 * S) {
       size -= 2 * S;
       tCtx.font = '600 ' + size + 'px Jost';
+      probe = label.split('').map(function (ch) { return tCtx.measureText(ch).width; });
+      probeTotal = probe.reduce(function (a, b) { return a + b; }, 0);
     }
-    tCtx.fillText(label, (tCv.width - tCtx.measureText(label).width) / 2, 847 * S);
+    items.push({ font: tCtx.font, pos: layoutText(tCtx, label, foldX, 0, forOpen, foldX, 10 * S), y: 847 * S });
+    tCtx.font = '500 ' + etSize + 'px Jost';
+    items.push({ font: tCtx.font, pos: layoutText(tCtx, 'ECHOTAG', foldX, etSpacing, forOpen, foldX, 6 * S), y: 1536 * S });
 
-    // Papier in die Buchstaben holen (weich), dann auf die Textform schneiden
+    items.forEach(function (it) {
+      tCtx.font = it.font;
+      it.pos.forEach(function (g) { tCtx.fillText(g.ch, g.x, it.y); });
+    });
+
+    // Papier weich in die Buchstaben holen, dann auf die Textform schneiden
     tCtx.globalCompositeOperation = 'soft-light';
     tCtx.globalAlpha = 0.55;
     tCtx.drawImage(img, 0, 0, tCv.width, tCv.height);
@@ -264,22 +313,14 @@
     mCtx.fillStyle = '#000';
     mCtx.textAlign = 'left';
     mCtx.textBaseline = 'alphabetic';
-    mCtx.font = '500 ' + fuerSize + 'px Jost';
-    drawSpaced(mCtx, 'FÜR', FOLD_X, 738 * S, fuerSpacing);
-    mCtx.font = '600 ' + size + 'px Jost';
-    mCtx.fillText(label, (mCv.width - mCtx.measureText(label).width) / 2, 847 * S);
+    items.forEach(function (it) {
+      mCtx.font = it.font;
+      it.pos.forEach(function (g) { mCtx.fillText(g.ch, g.x, it.y); });
+    });
     tCtx.globalCompositeOperation = 'destination-in';
     tCtx.drawImage(mCv, 0, 0);
     tCtx.globalCompositeOperation = 'source-over';
-    ctx.drawImage(tCv, 0, 0);
-
-    // Papierkorn ueber den Druck legen
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = grainPat;
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.globalAlpha = 1;
-    roundCorners(ctx, cv.width, cv.height);   // Ecken wie echte Grusskarte (Max 14:13)
-    return cv;
+    return tCv;
   }
 
   // Innenseiten: Creme-Papier, Artwork-Korn scheint durch (v3-Mechanik, EchoTag-Creme)
@@ -345,14 +386,15 @@
   // ============================================================
   //  3D-Gatefold
   // ============================================================
-  var renderer = null, scene, camera, cardGroup, pivL, pivR, blobShadow;
+  var renderer = null, scene, camera, cardGroup, pivL, pivR, blobShadow, textMats, shadowL, shadowR;
   var halfW, cardH = 3.3, z0 = 8;
   var rafId = null, lastFrame = 0;
   var swayOn = true, swayT = 0;
   var tapTime = 0, swayRotY = 0, swayRotX = 0;
   var openStart = 0, frozenP = null;
 
-  function initGL(frontCanvas, backCanvas) {
+  function initGL(front, backCanvas) {
+    var frontCanvas = front.art || front;   // Fallback-Pfad liefert nur eine Flaeche
     var ctxTries = 0;
     while (ctxTries < 3) {
       try {
@@ -417,6 +459,19 @@
     var backMatL = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9, metalness: 0, alphaTest: 0.5 });
     var backMatR = backMatL.clone();
 
+    // Druck-Overlays (closed/open) als eigene Ebenen ueber dem Artwork
+    textMats = null;
+    if (front.textClosed && front.textOpen) {
+      var tcx = new THREE.CanvasTexture(front.textClosed);
+      tcx.encoding = THREE.sRGBEncoding; tcx.anisotropy = 4;
+      var tox = new THREE.CanvasTexture(front.textOpen);
+      tox.encoding = THREE.sRGBEncoding; tox.anisotropy = 4;
+      textMats = {
+        closed: new THREE.MeshStandardMaterial({ map: tcx, transparent: true, depthWrite: false, roughness: 0.95, metalness: 0 }),
+        open: new THREE.MeshStandardMaterial({ map: tox, transparent: true, depthWrite: false, opacity: 0, roughness: 0.95, metalness: 0 })
+      };
+    }
+
     // Kantenmaterialien: Druck (inkl. Name) laeuft um die Ecke wie bei dickem Karton
     function edgeMat(c) {
       var t = new THREE.CanvasTexture(c);
@@ -474,12 +529,54 @@
       gbo.translate(xOff, -cardH / 2, -THICK / 2);
       pivot.add(new THREE.Mesh(gbo, L ? mBotL : mBotR));
 
+      // Druck-Overlays auf der Vorderseite (gleiche UV-Haelfte wie der Fluegel)
+      if (textMats) {
+        var gtA = new THREE.PlaneGeometry(halfW, cardH);
+        var uvA = gtA.attributes.uv;
+        for (i = 0; i < uvA.count; i++) uvA.setX(i, L ? uvA.getX(i) * 0.5 : 0.5 + uvA.getX(i) * 0.5);
+        gtA.translate(xOff, 0, 0.002);
+        var mA = new THREE.Mesh(gtA, textMats.closed);
+        mA.renderOrder = 1;
+        pivot.add(mA);
+        var gtB = new THREE.PlaneGeometry(halfW, cardH);
+        var uvB = gtB.attributes.uv;
+        for (i = 0; i < uvB.count; i++) uvB.setX(i, L ? uvB.getX(i) * 0.5 : 0.5 + uvB.getX(i) * 0.5);
+        gtB.translate(xOff, 0, 0.004);
+        var mB = new THREE.Mesh(gtB, textMats.open);
+        mB.renderOrder = 2;
+        pivot.add(mB);
+      }
+
       return pivot;
     }
 
     pivL = wing('L'); pivL.position.x = -halfW;
     pivR = wing('R'); pivR.position.x = halfW;
     cardGroup.add(pivL); cardGroup.add(pivR);
+
+    // Weiche Fluegelschatten im Spalt (Max 14:53: "nur der Schatten der jeweiligen
+    // Seite"): Gradient von der Innenkante in den Spalt, liegt auf dem Karteninneren
+    function makeShadow(mirror) {
+      var c = document.createElement('canvas');
+      c.width = 128; c.height = 8;
+      var x = c.getContext('2d');
+      var gr = x.createLinearGradient(0, 0, 128, 0);
+      gr.addColorStop(0, 'rgba(40,28,20,1)');
+      gr.addColorStop(1, 'rgba(40,28,20,0)');
+      x.fillStyle = gr; x.fillRect(0, 0, 128, 8);
+      var t = new THREE.CanvasTexture(c);
+      t.encoding = THREE.sRGBEncoding;
+      var m = new THREE.Mesh(
+        new THREE.PlaneGeometry(halfW * 0.5, cardH * 1.12),
+        new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0, side: THREE.DoubleSide })
+      );
+      if (mirror) m.scale.x = -1;
+      m.position.z = -0.3;
+      return m;
+    }
+    shadowL = makeShadow(false);
+    shadowR = makeShadow(true);
+    cardGroup.add(shadowL); cardGroup.add(shadowR);
 
 
     window.addEventListener('resize', fit);
@@ -536,6 +633,21 @@
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
       // v3: Welt blendet synchron zur Oeffnung ein
       sceneImg.style.opacity = smooth(p * 2.2);
+      // Druck-Morph closed -> open (Falz-Luecke), unsichtbar in der ersten Bewegung
+      if (textMats) {
+        var tk = smooth((p - 0.04) / 0.1);
+        textMats.closed.opacity = 1 - tk;
+        textMats.open.opacity = tk;
+      }
+      // Seitenschatten folgen den Innenkanten (Pivot fest, Kante aus Rotation)
+      if (shadowL) {
+        var inX = halfW * Math.cos(theta);
+        shadowL.position.x = -halfW + inX + halfW * 0.24;
+        shadowR.position.x = halfW - inX - halfW * 0.24;
+        var shOp = 0.55 * smooth(p * 3) * (p > 0.8 ? Math.max(0, 1 - (p - 0.8) / 0.2) : 1);
+        shadowL.material.opacity = shOp;
+        shadowR.material.opacity = shOp;
+      }
       // v3: Karte fadet im letzten Fuenftel aus
       glCanvas.style.opacity = p > 0.8 ? Math.max(0, 1 - (p - 0.8) / 0.2) : 1;
       if (p >= 1 && frozenP === null) endOpening();
@@ -1018,6 +1130,8 @@
     if (renderer) {
       frozenP = null;
       pivL.rotation.y = 0; pivR.rotation.y = 0;
+      if (textMats) { textMats.closed.opacity = 1; textMats.open.opacity = 0; }
+      if (shadowL) { shadowL.material.opacity = 0; shadowR.material.opacity = 0; }
       glCanvas.style.filter = '';
       camera.position.set(0, 0, z0);
       cardGroup.rotation.set(0, 0, 0);
@@ -1158,5 +1272,5 @@
   loadFonts()
     .then(function () { return loadImage('card-front.jpg'); })
     .then(function (img) { ready(bakeFront(img, recipient), bakeBack(img)); })
-    .catch(function () { var f = bakeFrontFallback(recipient); ready(f, bakeBack(f)); });
+    .catch(function () { var f = bakeFrontFallback(recipient); ready({ art: f }, bakeBack(f)); });
 })();
