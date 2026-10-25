@@ -35,7 +35,7 @@
   };
   var OPEN_ANGLE = 2.96;  // ~170 Grad
   var CARD_W = 905, CARD_H = 1600;
-  var THICK = 0.055;      // Materialstaerke der Karte (dicke Kartonage)
+  var THICK = 0.028;      // Materialstaerke: 1.5% der Kartenbreite (Max 09:20: 1-2%)
 
   // ---------- URL-Parameter ----------
   var qs = new URLSearchParams(location.search);
@@ -248,14 +248,24 @@
     return cv;
   }
 
-  // Streifen aus der gebackenen Vorderseite fuer die Kanten (Druck laeuft um die Ecke)
-  function edgeStrip(cv, sx, sy, sw, sh, dw, dh) {
+  // Schnittkante in hellem Papierweiss (Max 09:20): die Kante muss beim
+  // Schwenken als helle Papierschicht lesbar sein, nicht als umgedruckter Rotton.
+  function paperEdge(dw, dh, along) {
     var c = document.createElement('canvas');
     c.width = dw; c.height = dh;
     var x = c.getContext('2d');
-    x.drawImage(cv, sx, sy, sw, sh, 0, 0, dw, dh);
+    x.fillStyle = '#f5f1e6';            // warmes Papierweiss wie Karton-Schnitt
+    x.fillRect(0, 0, dw, dh);
+    // leichte Schicht-Struktur entlang der Kante (Kartonage-Lagen)
+    x.globalAlpha = 0.12;
+    var ln = along === 'h' ? dw : dh;
+    for (var ly = 0; ly < ln; ly += 3) {
+      x.fillStyle = (ly % 6 === 0) ? '#e6e0d0' : '#fbf8ef';
+      if (along === 'h') x.fillRect(ly, 0, 1, dh); else x.fillRect(0, ly, dw, 1);
+    }
+    x.globalAlpha = 1;
     x.globalCompositeOperation = 'multiply';
-    x.fillStyle = 'rgb(224,224,224)';
+    x.fillStyle = 'rgb(235,235,235)';   // mattieren wie Schnittkante
     x.fillRect(0, 0, dw, dh);
     x.globalCompositeOperation = 'source-over';
     if (grainPat) {
@@ -330,22 +340,20 @@
     var backMatR = backMatL.clone();
 
     // Kantenmaterialien: Druck (inkl. Name) laeuft um die Ecke wie bei dickem Karton
-    var FCW = frontCanvas.width, FCH = frontCanvas.height, FH = FCW / 2;
     function edgeMat(c) {
       var t = new THREE.CanvasTexture(c);
       t.encoding = THREE.sRGBEncoding;
       t.anisotropy = 4;
       return new THREE.MeshStandardMaterial({ map: t, roughness: 1.0, metalness: 0 });
     }
-    var EW = 14;
-    var mInL = edgeMat(edgeStrip(frontCanvas, FH - EW, 0, EW, FCH, 64, 1600));
-    var mOutL = edgeMat(edgeStrip(frontCanvas, 0, 0, EW, FCH, 64, 1600));
-    var mInR = edgeMat(edgeStrip(frontCanvas, FH, 0, EW, FCH, 64, 1600));
-    var mOutR = edgeMat(edgeStrip(frontCanvas, FCW - EW, 0, EW, FCH, 64, 1600));
-    var mTopL = edgeMat(edgeStrip(frontCanvas, 0, 0, FH, EW, 800, 64));
-    var mBotL = edgeMat(edgeStrip(frontCanvas, 0, FCH - EW, FH, EW, 800, 64));
-    var mTopR = edgeMat(edgeStrip(frontCanvas, FH, 0, FH, EW, 800, 64));
-    var mBotR = edgeMat(edgeStrip(frontCanvas, FH, FCH - EW, FH, EW, 800, 64));
+    var mInL = edgeMat(paperEdge(64, 1600));
+    var mOutL = edgeMat(paperEdge(64, 1600));
+    var mInR = edgeMat(paperEdge(64, 1600));
+    var mOutR = edgeMat(paperEdge(64, 1600));
+    var mTopL = edgeMat(paperEdge(800, 64, 'h'));
+    var mBotL = edgeMat(paperEdge(800, 64, 'h'));
+    var mTopR = edgeMat(paperEdge(800, 64, 'h'));
+    var mBotR = edgeMat(paperEdge(800, 64, 'h'));
 
     function wing(side) {
       // Starrer, dicker Fluegel: Front z=0, Rueckseite z=-THICK, 4 bedruckte Kanten
