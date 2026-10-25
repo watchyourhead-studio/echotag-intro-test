@@ -453,8 +453,9 @@
       pivot.add(new THREE.Mesh(gb, L ? backMatL : backMatR));
 
       var xIn = L ? halfW : -halfW;
-      var gi = new THREE.PlaneGeometry(THICK, cardH);
-      gi.rotateY(L ? Math.PI / 2 : -Math.PI / 2);
+      // Gerundete Falz-Innenkante wie beim v2-Original (Max 14:35): halbzylindrischer
+      // Papier-Roll statt scharfer 90-Grad-Kante, tangential an Front und Rueckseite
+      var gi = new THREE.CylinderGeometry(THICK / 2, THICK / 2, cardH, 24, 1, true, L ? 0 : Math.PI, Math.PI);
       gi.translate(xIn, 0, -THICK / 2);
       pivot.add(new THREE.Mesh(gi, L ? mInL : mInR));
 
