@@ -567,6 +567,14 @@
   flightVideo.addEventListener('ended', function () {
     if (phase === 'flight') landCard();
   });
+  // Player faedet kurz vor dem Tower ein (Max 14:36): Landung startet, waehrend
+  // der Eiffelturm im Video-Endanflug noch hochwaechst. landCard() selbst prueft
+  // die Phase, bei Replay laeuft der Listener erneut korrekt.
+  flightVideo.addEventListener('timeupdate', function () {
+    if (phase !== 'flight') return;
+    if (isFinite(flightVideo.duration) && flightVideo.duration > 0 &&
+        flightVideo.currentTime >= flightVideo.duration - 1.2) landCard();
+  });
   flightVideo.addEventListener('stalled', function () {
     // haengt das Video, landet die Karte trotzdem (Watchdog laeuft)
   });
