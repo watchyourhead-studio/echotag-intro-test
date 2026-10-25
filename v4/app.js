@@ -188,6 +188,7 @@
       ctx.arcTo(0, h, 0, 0, r); ctx.arcTo(0, 0, w, 0, r);
       ctx.closePath();
     }
+    ctx.fillStyle = '#000';  // deckkraftvolle Maske: destination-in nutzt nur deren Alpha
     ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
   }
