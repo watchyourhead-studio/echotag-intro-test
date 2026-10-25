@@ -311,6 +311,9 @@
   var actx = AC ? new AC() : null;
   var bus = {}, buffers = {}, loops = {};
   var muted = false;
+  var wantAmbience = false;   // getippt, aber Musik evtl. noch nicht fertig geladen
+  // iOS 17+: Web Audio auch bei Lautlos-Schalter hoerbar, wie die Sprachnachricht
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
   if (actx) {
     bus.master = actx.createGain(); bus.master.connect(actx.destination);
     ['music', 'atmo', 'sfx'].forEach(function (k) { bus[k] = actx.createGain(); bus[k].gain.value = 0; bus[k].connect(bus.master); });
@@ -318,7 +321,11 @@
     ['musik', 'atmo', 'klick', 'kette', 'turm'].forEach(function (n) {
       fetch('audio/' + n + '.mp3').then(function (r) { return r.arrayBuffer(); }).then(function (data) {
         // Safari kennt nur die Callback-Form
-        actx.decodeAudioData(data, function (b) { buffers[n] = b; }, function () {});
+        actx.decodeAudioData(data, function (b) {
+          buffers[n] = b;
+          // Wer schneller getippt hat, als die Musik geladen war, bekommt sie jetzt
+          if (wantAmbience && (n === 'musik' || n === 'atmo') && !loops[n]) startAmbience();
+        }, function () {});
       }).catch(function () {});
     });
   }
@@ -351,8 +358,9 @@
   }
   function voiceOn() { return !voice.paused && !voice.ended; }
   function startAmbience() {
-    startLoop('musik', 'music');
-    startLoop('atmo', 'atmo');
+    wantAmbience = true;
+    if (!loops.musik) startLoop('musik', 'music');
+    if (!loops.atmo) startLoop('atmo', 'atmo');
     ramp(bus.music, voiceOn() ? VOL.musicDucked : VOL.music, 6);
     ramp(bus.atmo, voiceOn() ? VOL.atmoDucked : VOL.atmo, 4);
   }
@@ -471,6 +479,7 @@
     cardWrap.setAttribute('aria-hidden', 'true');
     dayNight.classList.remove('is-visible', 'is-day');
     soundBtn.classList.remove('is-visible');
+    wantAmbience = false;
     if (actx) { ramp(bus.music, 0, 2); ramp(bus.atmo, 0, 2); later(function () { stopLoop('musik'); stopLoop('atmo'); }, 2100); }
     tween('snow', 0, 900);
     toDay();
