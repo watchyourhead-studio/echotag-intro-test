@@ -5,15 +5,19 @@
   //  CONFIG - Kartenfarbe und Palette hier zentral aenderbar
   // ============================================================
   var COLORS = {
-    card:  '#F6F1E8',  // Kartengrund (Creme)
-    blue:  '#22306E',  // Tiefblau: Rahmen, Schrift, Raender
-    pink:  '#EBC7D2',  // Akzentlinie
-    ink:   '#22306E'   // Druckfarbe des Namens
+    card:  '#22306E',  // Kartenfront: eine Farbe (Tiefblau)
+    cream: '#F6F1E8',  // Innenseiten, Player-Karte, Szene-Papier
+    blue:  '#22306E',  // Tiefblau: Schrift, UI
+    pink:  '#EBC7D2',  // Akzent
+    ink:   '#F6F1E8'   // Farbe des Empfaengernamens (Live-Textebene, CSS)
   };
 
   // ---------- Konstanten ----------
   var OPEN_MS = 1700;     // Dauer der Gatefold-Oeffnung
-  var FLIGHT_MS = 1500;   // Flugphase bis die Player-Karte einfliegt
+  var SCENE_MS = 6000;    // Dauer der Zeichen-Flugphase bis die Player-Karte einfliegt
+  var STROKE_DUR = 0.15;  // Anteil: Strich-Phase pro Ebene
+  var COLOR_DUR = 0.20;   // Anteil: Farb-Phase pro Ebene
+  var CAM_Z = 320;        // Kamera-Dolly in px (Perspektive 1000)
   var OPEN_ANGLE = 2.96;  // ~170 Grad
   var CARD_W = 905, CARD_H = 1600;
   var THICK = 0.055;      // Materialstaerke der Karte (dicke Kartonage)
@@ -22,13 +26,18 @@
   var qs = new URLSearchParams(location.search);
   var recipient = (qs.get('name') || 'Julia').replace(/\s+/g, ' ').trim().slice(0, 24) || 'Julia';
   var debugState = qs.get('state');
+  var debugScene = qs.has('scene') ? parseFloat(qs.get('scene')) : null;
   var debugT = qs.has('t') ? parseFloat(qs.get('t')) : null;
 
   // ---------- DOM ----------
   var stage = document.getElementById('stage');
   var glCanvas = document.getElementById('gl');
   var fallback = document.getElementById('fallback');
-  var revealPoster = document.getElementById('revealPoster');
+  var sceneEl = document.getElementById('scene');
+  var sceneCam = document.getElementById('sceneCam');
+  var snowCv = document.getElementById('snow');
+  var cardname = document.getElementById('cardname');
+  var cardnameText = document.getElementById('cardnameText');
   var veil = document.getElementById('veil');
   var taplayer = document.getElementById('taplayer');
   var hint = document.getElementById('hint');
@@ -111,97 +120,34 @@
     });
   }
 
-  // Vorderseite: Creme-Karte, Aquarell-Motiv, blauer Rahmen, "FUER <NAME>" im Druckstil
-  function bakeFront(img, name) {
+  // Vorderseite: NUR eine Farbe, kein Motiv, kein eingebrannter Name.
+  // Der Empfaengername ist eine Live-Textebene im DOM (Jost), damit dasselbe
+  // Material fuer alle Empfaenger funktioniert.
+  function bakeFront() {
     var S = 2;
     var cv = document.createElement('canvas');
     cv.width = CARD_W * S; cv.height = CARD_H * S;
     var ctx = cv.getContext('2d');
-    if (!grainPat) makeGrain(ctx);
-
-    // Kartengrund
     ctx.fillStyle = COLORS.card;
     ctx.fillRect(0, 0, cv.width, cv.height);
-
-    // Aquarell-Motiv (Originalverhaeltnis)
-    var mw = cv.width - 2 * 90 * S;
-    var mh = mw * (img.height / img.width);
-    ctx.drawImage(img, 90 * S, 150 * S, mw, mh);
-
-    // Blauer Rahmen wie im Artwork
-    ctx.strokeStyle = COLORS.blue;
-    ctx.lineWidth = 18 * S;
-    ctx.strokeRect(26 * S, 26 * S, cv.width - 52 * S, cv.height - 52 * S);
-
-    // Pink-Akzentlinie
-    ctx.fillStyle = COLORS.pink;
-    ctx.fillRect(cv.width / 2 - 35 * S, 1030 * S, 70 * S, 6 * S);
-
-    // Name auf separater Flaeche backen: Tiefblau + Papierfasern,
-    // damit der Text wie eingedruckt wirkt statt wie aufgeklebt
-    var tCv = document.createElement('canvas');
-    tCv.width = cv.width; tCv.height = cv.height;
-    var tCtx = tCv.getContext('2d');
-    tCtx.fillStyle = COLORS.ink;
-    tCtx.textAlign = 'left';
-    tCtx.textBaseline = 'alphabetic';
-
-    var fuerSize = 30 * S;
-    tCtx.font = '500 ' + fuerSize + 'px Jost';
-    drawSpaced(tCtx, 'FÜR', tCv.width / 2, 1150 * S, 10 * S);
-
-    var label = name.toUpperCase();
-    var size = 92 * S;
-    var maxW = tCv.width * 0.78;
-    tCtx.font = '600 ' + size + 'px Jost';
-    while (tCtx.measureText(label).width > maxW && size > 16 * S) {
-      size -= 2 * S;
-      tCtx.font = '600 ' + size + 'px Jost';
-    }
-    tCtx.fillText(label, (tCv.width - tCtx.measureText(label).width) / 2, 1280 * S);
-
-    // Papierfasern in die Buchstaben holen: Kartengrund weich einmischen,
-    // danach auf die Textform zurueckschneiden
-    tCtx.globalCompositeOperation = 'soft-light';
-    tCtx.globalAlpha = 0.5;
-    tCtx.drawImage(cv, 0, 0);
-    tCtx.globalAlpha = 1;
-    var mCv = document.createElement('canvas');
-    mCv.width = tCv.width; mCv.height = tCv.height;
-    var mCtx = mCv.getContext('2d');
-    mCtx.fillStyle = '#000';
-    mCtx.textAlign = 'left';
-    mCtx.textBaseline = 'alphabetic';
-    mCtx.font = '500 ' + fuerSize + 'px Jost';
-    drawSpaced(mCtx, 'FÜR', mCv.width / 2, 1150 * S, 10 * S);
-    mCtx.font = '600 ' + size + 'px Jost';
-    mCtx.fillText(label, (mCv.width - mCtx.measureText(label).width) / 2, 1280 * S);
-    tCtx.globalCompositeOperation = 'destination-in';
-    tCtx.drawImage(mCv, 0, 0);
-    tCtx.globalCompositeOperation = 'source-over';
-    ctx.drawImage(tCv, 0, 0);
-
-    // Papierkorn ueber den Druck legen
-    ctx.globalAlpha = 0.5;
+    if (!grainPat) makeGrain(ctx);
+    ctx.globalAlpha = 0.4;
     ctx.fillStyle = grainPat;
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
     return cv;
   }
 
-  // Innenseiten: Creme-Papier mit Rahmen und Korn, ohne Aufdruck (Platzhalter)
+  // Innenseiten: Creme-Papier mit Korn, ohne Aufdruck
   function bakeBack() {
     var S = 1;
     var cv = document.createElement('canvas');
     cv.width = CARD_W * S; cv.height = CARD_H * S;
     var ctx = cv.getContext('2d');
-    ctx.fillStyle = COLORS.card;
+    ctx.fillStyle = COLORS.cream;
     ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.strokeStyle = COLORS.blue;
-    ctx.lineWidth = 10 * S;
-    ctx.strokeRect(30 * S, 30 * S, cv.width - 60 * S, cv.height - 60 * S);
     if (!grainPat) makeGrain(ctx);
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.4;
     ctx.fillStyle = grainPat;
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
@@ -388,6 +334,11 @@
     var dt = Math.min(0.05, (now - lastFrame) / 1000 || 0.016);
     lastFrame = now;
 
+    if (phase === 'flight' && frozenSceneT === null) {
+      var st = clamp((now - sceneT0) / SCENE_MS, 0, 1);
+      setScene(st);
+      if (st >= 1) landCard();
+    }
     if (phase === 'opening' || frozenP !== null) {
       var p = frozenP !== null ? frozenP : clamp((now - openStart) / OPEN_MS, 0, 1);
       var e = easeInOutCubic(p);
@@ -400,12 +351,18 @@
       glCanvas.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(1) + 'px)' : '';
       cardGroup.rotation.y *= 0.85; cardGroup.rotation.x *= 0.85;
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
+      // Name loest sich zu Beginn der Oeffnung auf (Live-Ebene, kein Einbrennen)
+      var kn = 1 - smooth((p - 0.05) / 0.25);
+      cardname.style.opacity = kn;
+      cardname.style.filter = kn > 0.01 ? 'blur(' + ((1 - kn) * 14).toFixed(1) + 'px)' : '';
+      cardname.style.visibility = kn > 0.01 ? 'visible' : 'hidden';
       // Welt dahinter blendet synchron zur Oeffnung ein
-      revealPoster.style.opacity = smooth(p * 2.2);
+      sceneEl.style.opacity = smooth(p * 2.2);
       if (p > 0.8) glCanvas.style.opacity = Math.max(0, 1 - (p - 0.8) / 0.2);
       if (p >= 1 && frozenP === null) endOpening();
     }
-    renderFrame(dt);
+    if (phase !== 'flight' && phase !== 'landing' && phase !== 'player') renderFrame(dt);
+    drawSnow(now);
   }
 
   function startLoop() {
@@ -416,6 +373,111 @@
   }
   function stopLoop() {
     if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  // ============================================================
+  //  Szenen-Flug: Straße wird waehrend des Flugs gezeichnet
+  //  (Ebenen aus Max' Aquarell, Strich-Reveal -> Farb-Fade, Turm zuletzt)
+  // ============================================================
+  var LAYERS = [
+    // z = Tiefe in px (Perspektive 1000), s = Strich-Start, c = Farb-Start (Anteile)
+    { id: 'ground',      z: 750,  s: 0.04, c: 0.24 },
+    { id: 'people',      z: 200,  s: 0.08, c: 0.28 },
+    { id: 'awning',      z: 600,  s: 0.14, c: 0.34 },
+    { id: 'trees',       z: 400,  s: 0.20, c: 0.40 },
+    { id: 'buildings-l', z: 1000, s: 0.28, c: 0.48 },
+    { id: 'buildings-r', z: 1000, s: 0.33, c: 0.52 },
+    { id: 'sky',         z: 1500, s: 0.40, c: 0.58 },
+    { id: 'tower',       z: 1350, s: 0.64, c: 0.84 }
+  ];
+  var sceneT0 = 0, frozenSceneT = null;
+  var sceneDone = false, snowOn = false, snowP = [];
+
+  // Ebenen einmalig mit Tiefe versetzt (Skalenausgleich fuer die Perspektive)
+  LAYERS.forEach(function (l) {
+    var el = document.getElementById('sl-' + l.id);
+    l.el = el;
+    l.stroke = el.querySelector('.sl-stroke');
+    l.color = el.querySelector('.sl-color');
+    var k = (1000 + l.z) / 1000;
+    el.style.transform = 'translateZ(' + (-l.z) + 'px) scale(' + k.toFixed(4) + ')';
+  });
+
+  function setScene(t) {
+    // t: 0..1 entlang SCENE_MS
+    LAYERS.forEach(function (l) {
+      var sp = clamp((t - l.s) / STROKE_DUR, 0, 1);   // Strich-Fortschritt
+      var cp = clamp((t - l.c) / COLOR_DUR, 0, 1);    // Farb-Fortschritt
+      l.stroke.style.setProperty('--p', sp.toFixed(4));
+      l.stroke.style.opacity = sp > 0 ? 1 : 0;
+      l.color.style.opacity = cp;
+      l.color.style.filter = cp > 0 && cp < 1 ? 'blur(' + ((1 - cp) * 7).toFixed(1) + 'px)' : (cp >= 1 ? '' : 'blur(7px)');
+    });
+    // leichter Kamera-Flug durch die Strasse
+    var cz = CAM_Z * easeInOutCubic(clamp(t, 0, 1));
+    sceneCam.style.transform = 'translateZ(' + cz.toFixed(1) + 'px)';
+    if (t >= 0.93) startSnow();
+    if (t >= 1) sceneDone = true;
+  }
+
+  function resetScene() {
+    LAYERS.forEach(function (l) {
+      l.stroke.style.setProperty('--p', '0');
+      l.stroke.style.opacity = 0;
+      l.color.style.opacity = 0;
+      l.color.style.filter = 'blur(7px)';
+    });
+    sceneCam.style.transform = 'translateZ(0px)';
+    sceneEl.style.opacity = 0;
+    sceneDone = false;
+    stopSnow();
+  }
+
+  // Schnee erst in der fertigen Endszene
+  function startSnow() {
+    if (snowOn) return;
+    snowOn = true;
+    var w = stage.clientWidth, h = stage.clientHeight;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    snowCv.width = w * dpr; snowCv.height = h * dpr;
+    snowCv.style.width = w + 'px'; snowCv.style.height = h + 'px';
+    snowP = [];
+    for (var i = 0; i < 90; i++) {
+      snowP.push({
+        x: Math.random() * w, y: Math.random() * h,
+        r: 0.8 + Math.random() * 1.8,
+        v: 14 + Math.random() * 22,
+        drift: 6 + Math.random() * 10,
+        ph: Math.random() * 6.28
+      });
+    }
+  }
+  function stopSnow() {
+    snowOn = false;
+    var c = snowCv.getContext('2d');
+    if (c) c.clearRect(0, 0, snowCv.width, snowCv.height);
+  }
+  var snowLast = 0;
+  function drawSnow(now) {
+    if (!snowOn) return;
+    var c = snowCv.getContext('2d');
+    if (!c) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = snowCv.width / dpr, h = snowCv.height / dpr;
+    var dt = Math.min(0.05, (now - snowLast) / 1000 || 0.016);
+    snowLast = now;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,253,250,.85)';
+    for (var i = 0; i < snowP.length; i++) {
+      var f = snowP[i];
+      f.y += f.v * dt;
+      f.x += Math.sin(now / 1400 + f.ph) * f.drift * dt;
+      if (f.y > h + 4) { f.y = -4; f.x = Math.random() * w; }
+      c.beginPath();
+      c.arc(f.x, f.y, f.r, 0, 6.283);
+      c.fill();
+    }
   }
 
   // ============================================================
@@ -439,10 +501,13 @@
       glCanvas.style.opacity = 1;
       openStart = performance.now();
     } else {
-      // Fallback: statische Karte ausblenden, Welt direkt zeigen
+      // Fallback ohne WebGL: statische Karte ausblenden, fertige Szene direkt zeigen
       fallback.style.transition = 'opacity .8s ease';
       fallback.style.opacity = 0;
-      revealPoster.style.opacity = 1;
+      cardname.style.opacity = 0;
+      cardname.style.visibility = 'hidden';
+      sceneEl.style.opacity = 1;
+      setScene(1);
       clearTimeout(flightTimer);
       flightTimer = setTimeout(landCard, 900);
     }
@@ -451,10 +516,9 @@
   function endOpening() {
     phase = 'flight';
     glCanvas.style.opacity = 0;
-    revealPoster.style.opacity = 1;
-    stopLoop();
-    clearTimeout(flightTimer);
-    flightTimer = setTimeout(landCard, FLIGHT_MS);
+    sceneEl.style.opacity = 1;
+    sceneT0 = performance.now();
+    // Loop laeuft weiter: sie treibt die Szenen-Zeitleiste
   }
 
   function landCard() {
@@ -476,7 +540,10 @@
     clearTimeout(audioTimer);
     clearTimeout(flightTimer);
     audio.pause(); audio.currentTime = 0; audio.muted = false;
-    revealPoster.style.opacity = 0;
+    resetScene();
+    cardname.style.opacity = 1;
+    cardname.style.filter = '';
+    cardname.style.visibility = 'visible';
     veil.classList.remove('is-on');
     card.classList.remove('is-in');
     cardWrap.setAttribute('aria-hidden', 'true');
@@ -577,6 +644,9 @@
     phase = 'closed';
     setHint(HINT_DEFAULT, false);
 
+    // Empfaengername als Live-Textebene (wird nie ins Material eingebrannt)
+    cardnameText.textContent = recipient.toUpperCase();
+
     // Debug-/Testzustaende fuer Screenshots
     if (renderer && debugT !== null && !isNaN(debugT)) {
       frozenP = clamp(debugT, 0, 1);
@@ -585,12 +655,30 @@
     if (renderer && debugState === 'open') {
       frozenP = 1;
       swayOn = false;
-      revealPoster.style.opacity = 1;
+      cardname.style.opacity = 0;
+      cardname.style.visibility = 'hidden';
+      sceneEl.style.opacity = 1;
+      setScene(1);
+    }
+    if (debugScene !== null && !isNaN(debugScene)) {
+      // Szene eingefroren (Flugmitte/Endzustand), Karte weg
+      if (renderer) { stopLoop(); glCanvas.style.opacity = 0; }
+      else fallback.style.opacity = 0;
+      cardname.style.opacity = 0;
+      cardname.style.visibility = 'hidden';
+      taplayer.classList.add('is-hidden');
+      sceneEl.style.opacity = 1;
+      phase = 'flight';
+      frozenSceneT = clamp(debugScene, 0, 1);
+      setScene(frozenSceneT);
     }
     if (debugState === 'player') {
       if (renderer) { stopLoop(); glCanvas.style.opacity = 0; }
       else fallback.style.opacity = 0;
-      revealPoster.style.opacity = 1;
+      cardname.style.opacity = 0;
+      cardname.style.visibility = 'hidden';
+      sceneEl.style.opacity = 1;
+      setScene(1);
       phase = 'flight';
       veil.style.transition = 'none';
       card.style.transition = 'none';
@@ -606,18 +694,7 @@
 
   if (audio.readyState >= 1) tDur.textContent = fmt(audio.duration);
 
-  Promise.all([loadImage('motiv.jpg'), loadFonts()])
-    .then(function (r) {
-      ready(bakeFront(r[0], recipient), bakeBack());
-    })
-    .catch(function () {
-      // Schrift oder Bild nicht ladbar: trotzdem Karte zeigen
-      loadImage('motiv.jpg').then(function (img) {
-        ready(bakeFront(img, recipient), bakeBack());
-      }, function () {
-        glCanvas.style.display = 'none';
-        fallback.hidden = false;
-        phase = 'closed';
-      });
-    });
+  loadFonts()
+    .then(function () { ready(bakeFront(), bakeBack()); })
+    .catch(function () { ready(bakeFront(), bakeBack()); });
 })();

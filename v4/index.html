@@ -10,11 +10,25 @@
 </head>
 <body>
 <div class="stage" id="stage">
-  <img src="reveal.jpg" alt="" class="reveal" id="revealPoster" draggable="false">
-  <canvas id="gl" aria-hidden="true"></canvas>
-  <div class="fallback" id="fallback" hidden>
-    <img src="card-front-fallback.jpg" alt="Geschlossene Weihnachtskarte von EchoTag" draggable="false">
+  <div class="scene" id="scene">
+    <div class="scene-cam" id="sceneCam">
+      <div class="sl" id="sl-sky"><img class="sl-stroke" src="scene/sky-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/sky.webp" alt="" draggable="false"></div>
+      <div class="sl" id="sl-tower"><img class="sl-stroke" src="scene/tower-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/tower.webp" alt="" draggable="false"></div>
+      <div class="sl" id="sl-buildings-r"><img class="sl-stroke" src="scene/buildings-r-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/buildings-r.webp" alt="" draggable="false"></div>
+      <div class="sl" id="sl-buildings-l"><img class="sl-stroke" src="scene/buildings-l-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/buildings-l.webp" alt="" draggable="false"></div>
+      <div class="sl" id="sl-ground"><img class="sl-stroke" src="scene/ground-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/ground.webp" alt="" draggable="false"></div>
+      <div class="sl" id="sl-awning"><img class="sl-stroke" src="scene/awning-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/awning.webp" alt="" draggable="false"></div>
+      <div class="sl" id="sl-trees"><img class="sl-stroke" src="scene/trees-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/trees.webp" alt="" draggable="false"></div>
+      <div class="sl" id="sl-people"><img class="sl-stroke" src="scene/people-lines.webp" alt="" draggable="false"><img class="sl-color" src="scene/people.webp" alt="" draggable="false"></div>
+    </div>
+    <canvas class="snow" id="snow"></canvas>
   </div>
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="cardname" id="cardname" aria-hidden="true">
+    <span class="cn-fuer">Für</span>
+    <span class="cn-name" id="cardnameText">Julia</span>
+  </div>
+  <div class="fallback" id="fallback" hidden></div>
   <div class="veil" id="veil"></div>
   <div class="taplayer" id="taplayer" role="button" tabindex="0" aria-label="Karte öffnen">
     <span class="testbadge">TEST</span>
