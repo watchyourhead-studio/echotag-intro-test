@@ -49,6 +49,7 @@
   var glCanvas = document.getElementById('gl');
   var fallback = document.getElementById('fallback');
   var sceneImg = document.getElementById('sceneImg');
+  var scrim = document.getElementById('scrim');
   var sceneEl = document.getElementById('scene');
   var flightVideo = document.getElementById('flight');
   var snowFxCv = document.getElementById('snowFx');
@@ -536,6 +537,10 @@
       if (blobShadow) blobShadow.material.opacity = 1 - smooth(p * 1.7);
       // v3: Welt blendet synchron zur Oeffnung ein
       sceneImg.style.opacity = smooth(p * 2.2);
+      // Karteninnere dunkel wie bei v2 (Max 14:43): der Spalt bleibt waehrend der
+      // Falzphase schwarz-braun, der Print laeuft lesbar durch; die helle Szene
+      // kommt erst, wenn die Fluegel weiter offen sind
+      scrim.style.opacity = 1 - smooth(clamp((p - 0.3) / 0.45, 0, 1));
       // v3: Karte fadet im letzten Fuenftel aus
       glCanvas.style.opacity = p > 0.8 ? Math.max(0, 1 - (p - 0.8) / 0.2) : 1;
       if (p >= 1 && frozenP === null) endOpening();
@@ -955,6 +960,7 @@
     phase = 'flight';
     glCanvas.style.opacity = 0;
     sceneImg.style.opacity = 1;
+    scrim.style.opacity = 0;
     stopLoop();
     startSnow();
     clearTimeout(flightTimer);
@@ -999,6 +1005,7 @@
     try { flightVideo.currentTime = 0; } catch (e) {}
     flightVideo.style.opacity = 0;
     sceneImg.style.opacity = 0;
+    scrim.style.opacity = 1;
     sceneEl.style.filter = '';
     sceneEl.style.transform = '';
     if (!renderer) {
@@ -1102,6 +1109,7 @@
     if (!ok) {
       glCanvas.style.display = 'none';
       fallback.hidden = false;
+      scrim.style.display = 'none';
     }
     phase = 'closed';
     setHint(HINT_DEFAULT, false);
@@ -1122,6 +1130,7 @@
       cardname.style.opacity = 0;
       cardname.style.visibility = 'hidden';
       sceneImg.style.opacity = 1;
+      scrim.style.opacity = 0;
       sceneEl.style.filter = '';
       sceneEl.style.transform = '';
     }
@@ -1135,6 +1144,7 @@
       sceneEl.style.transform = '';
       phase = 'flight';
       startSnow();
+      scrim.style.opacity = 0;
       veil.style.transition = 'none';
       card.style.transition = 'none';
       taplayer.classList.add('is-hidden');
