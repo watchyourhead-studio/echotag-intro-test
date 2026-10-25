@@ -640,7 +640,7 @@
       if (textMats && textMats.dWorld > 0) {
         var gapW = 2 * halfW * (1 - Math.cos(theta));
         var fr = clamp(gapW / textMats.dWorld, 0, 1);
-        var stp = Math.min(3, Math.floor(fr * 3 + 0.5));
+        var stp = Math.min(3, Math.floor(fr * 3 + 0.15));  // spaet schalten: Riss bleibt immer schmaler als der dunkle Spalt
         if (stp !== textMats.step) { textMats.step = stp; textMats.mat.map = textMats.tex[stp]; }
       }
       // Seitenschatten folgen den Innenkanten (Pivot fest, Kante aus Rotation)
