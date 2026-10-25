@@ -38,7 +38,8 @@
   };
   var OPEN_ANGLE = 2.96;  // ~170 Grad
   var CARD_W = 905, CARD_H = 1600;
-  var THICK = 0.055;      // Materialstaerke der Karte (v3-Wert, von Max abgenommen)
+  var THICK = 0.055;      // Materialstaerke der Karte (v3-Wert, von Max abgenommen; ~3% der Breite wie der Blender-Render)
+  var SCENE_BLUR0 = 7;    // Rack-Focus: Welt startet so unscharf, Oeffnung zieht den Fokus nach hinten
 
   // ---------- URL-Parameter ----------
   var qs = new URLSearchParams(location.search);
@@ -52,6 +53,7 @@
   var glCanvas = document.getElementById('gl');
   var fallback = document.getElementById('fallback');
   var sceneImg = document.getElementById('sceneImg');
+  var sceneEl = document.getElementById('scene');
   var flightVideo = document.getElementById('flight');
   var snowFxCv = document.getElementById('snowFx');
   var cardname = document.getElementById('cardname');
@@ -295,6 +297,7 @@
   var swayOn = true, swayT = 0;
   var tapTime = 0, swayRotY = 0, swayRotX = 0;
   var openStart = 0, frozenP = null;
+  var ghL = [], ghR = [];   // Nachzieher fuer Bewegungsunschaerfe
 
   function initGL(frontCanvas, backCanvas) {
     try {
@@ -306,9 +309,9 @@
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
 
-    var hemi = new THREE.HemisphereLight(0xfff8f0, 0xdcc9c2, 0.42);
+    var hemi = new THREE.HemisphereLight(0xfff8f0, 0xdcc9c2, 0.47);
     scene.add(hemi);
-    var key = new THREE.DirectionalLight(0xffffff, 0.6);
+    var key = new THREE.DirectionalLight(0xffffff, 0.55);
     key.position.set(-2.4, 3.4, 5.2);
     scene.add(key);
     var fillLight = new THREE.DirectionalLight(0xe8edff, 0.1);
@@ -320,8 +323,8 @@
     shCv.width = 256; shCv.height = 256;
     var shCtx = shCv.getContext('2d');
     var grad = shCtx.createRadialGradient(128, 128, 10, 128, 128, 126);
-    grad.addColorStop(0, 'rgba(10,16,44,0.34)');
-    grad.addColorStop(0.55, 'rgba(10,16,44,0.16)');
+    grad.addColorStop(0, 'rgba(10,16,44,0.27)');
+    grad.addColorStop(0.55, 'rgba(10,16,44,0.11)');
     grad.addColorStop(1, 'rgba(10,16,44,0)');
     shCtx.fillStyle = grad;
     shCtx.fillRect(0, 0, 256, 256);
@@ -409,6 +412,37 @@
     pivR = wing('R'); pivR.position.x = halfW;
     cardGroup.add(pivL); cardGroup.add(pivR);
 
+    // Bewegungsunschaerfe (Render-Learning): je Fluegel zwei halbtransparente
+    // Nachzieher, die um 45/90ms aeltere Schwenkwinkel zeigen. Nur Front+Rueck,
+    // ohne Kanten - bei 8-16% Deckkraft faellt das nicht auf und bleibt billig.
+    function ghostWing(side, base) {
+      var L = side === 'L';
+      var xOff = L ? halfW / 2 : -halfW / 2;
+      var gp = new THREE.Group();
+      var g = new THREE.PlaneGeometry(halfW, cardH);
+      var uv = g.attributes.uv, i;
+      for (i = 0; i < uv.count; i++) uv.setX(i, L ? uv.getX(i) * 0.5 : 0.5 + uv.getX(i) * 0.5);
+      g.translate(xOff, 0, 0);
+      var gb = new THREE.PlaneGeometry(halfW, cardH);
+      gb.rotateY(Math.PI);
+      gb.translate(xOff, 0, -THICK);
+      function gm(src) {
+        var m = src.clone();
+        m.transparent = true; m.opacity = base;
+        m.alphaTest = 0; m.depthWrite = false;
+        return m;
+      }
+      var mf = gm(frontMat), mb = gm(L ? backMatL : backMatR);
+      gp.add(new THREE.Mesh(g, mf));
+      gp.add(new THREE.Mesh(gb, mb));
+      gp.position.x = L ? -halfW : halfW;
+      gp.visible = false;
+      cardGroup.add(gp);
+      return { pivot: gp, mats: [mf, mb], base: base };
+    }
+    ghL = [ghostWing('L', 0.16), ghostWing('L', 0.08)];
+    ghR = [ghostWing('R', 0.16), ghostWing('R', 0.08)];
+
     window.addEventListener('resize', fit);
     fit();
     return true;
@@ -427,8 +461,8 @@
     camera.position.set(0, 0, z0);
     camera.lookAt(0, 0, 0);
     if (blobShadow) {
-      blobShadow.scale.set(halfW * 2 * 1.42, cardH * 1.24, 1);
-      blobShadow.position.set(0.1, -0.14, -0.5);
+      blobShadow.scale.set(halfW * 2 * 1.52, cardH * 1.3, 1);
+      blobShadow.position.set(0.1, -0.18, -0.5);
     }
   }
 
@@ -439,6 +473,20 @@
       cardGroup.rotation.x = Math.sin(swayT * 0.8) * 0.013;
     }
     renderer.render(scene, camera);
+  }
+
+  // Schwenkwinkel als Funktion der Timeline (auch fuer Nachzieher nutzbar)
+  function wingAngleL(ms) { var tMs = Math.max(0, ms - HOLD_MS); return -openEase(clamp(tMs / SWING_L_MS, 0, 1)) * OPEN_ANGLE; }
+  function wingAngleR(ms) { var tMs = Math.max(0, ms - HOLD_MS); return  openEase(clamp(tMs / SWING_R_MS, 0, 1)) * OPEN_ANGLE; }
+  function setGhost(g, aOld, aRef, p) {
+    var d = Math.abs(aRef - aOld);
+    var on = p < 1 && d > 0.012;
+    g.pivot.visible = on;
+    if (on) {
+      g.pivot.rotation.y = aOld;
+      var k = clamp(d / 0.10, 0, 1) * g.base;   // Staerke ~ Schwenkgeschwindigkeit
+      g.mats[0].opacity = k; g.mats[1].opacity = k;
+    }
   }
 
   function loop(now) {
@@ -452,9 +500,14 @@
       var tMs = Math.max(0, ms - HOLD_MS);   // 350ms Hold: Karte steht erst still
       var tL = clamp(tMs / SWING_L_MS, 0, 1);
       var tR = clamp(tMs / SWING_R_MS, 0, 1);
-      pivL.rotation.y = -openEase(tL) * OPEN_ANGLE;   // links schwingt schneller auf
-      pivR.rotation.y =  openEase(tR) * OPEN_ANGLE;   // rechts hinkt hinterher
+      pivL.rotation.y = wingAngleL(ms);   // links schwingt schneller auf (auf den Betrachter zu, wie v3)
+      pivR.rotation.y = wingAngleR(ms);   // rechts hinkt hinterher
       var p = tR; // globaler Fortschritt = langsamer rechter Fluegel
+      // Nachzieher positionieren (45/90ms hinter dem aktuellen Stand)
+      setGhost(ghL[0], wingAngleL(ms - 45), pivL.rotation.y, p);
+      setGhost(ghL[1], wingAngleL(ms - 90), wingAngleL(ms - 45), p);
+      setGhost(ghR[0], wingAngleR(ms - 45), pivR.rotation.y, p);
+      setGhost(ghR[1], wingAngleR(ms - 90), wingAngleR(ms - 45), p);
       // v3: Kamera schiebt durch das Tor; Karte laeuft dabei aus dem Fokus
       camera.position.z = z0 * (1 - 0.58 * smooth((p - 0.22) / 0.78));
       // v3: Tiefenschaerfe beim Heranfahren, max ~10px ab p>0.2
@@ -469,6 +522,10 @@
       cardname.style.visibility = kn > 0.01 ? 'visible' : 'hidden';
       // v3: Welt blendet synchron zur Oeffnung ein
       sceneImg.style.opacity = smooth(p * 2.2);
+      // Rack-Focus: Welt startet unscharf (DOF) und wird beim Durchflug scharf
+      var sb = SCENE_BLUR0 * (1 - smooth((p - 0.18) / 0.6));
+      sceneEl.style.filter = sb > 0.05 ? 'blur(' + sb.toFixed(1) + 'px)' : '';
+      sceneEl.style.transform = sb > 0.05 ? 'scale(1.04)' : '';
       // v3: Karte fadet im letzten Fuenftel aus
       glCanvas.style.opacity = p > 0.8 ? Math.max(0, 1 - (p - 0.8) / 0.2) : 1;
       if (p >= 1 && frozenP === null) endOpening();
@@ -868,6 +925,8 @@
       cardname.style.opacity = 0;
       cardname.style.visibility = 'hidden';
       sceneImg.style.opacity = 1;
+      sceneEl.style.filter = '';
+      sceneEl.style.transform = '';
       startSnow();
       clearTimeout(flightTimer);
       flightTimer = setTimeout(landCard, PLACEHOLDER_MS);
@@ -878,6 +937,12 @@
     phase = 'flight';
     glCanvas.style.opacity = 0;
     sceneImg.style.opacity = 1;
+    sceneEl.style.filter = '';
+    sceneEl.style.transform = '';
+    if (ghL.length) {
+      ghL[0].pivot.visible = false; ghL[1].pivot.visible = false;
+      ghR[0].pivot.visible = false; ghR[1].pivot.visible = false;
+    }
     stopLoop();
     startSnow();
     clearTimeout(flightTimer);
@@ -922,6 +987,8 @@
     try { flightVideo.currentTime = 0; } catch (e) {}
     flightVideo.style.opacity = 0;
     sceneImg.style.opacity = 0;
+    sceneEl.style.filter = 'blur(' + SCENE_BLUR0 + 'px)';
+    sceneEl.style.transform = 'scale(1.04)';
     cardname.style.opacity = 1;
     cardname.style.filter = '';
     cardname.style.visibility = 'visible';
@@ -931,6 +998,10 @@
     if (renderer) {
       frozenP = null;
       pivL.rotation.y = 0; pivR.rotation.y = 0;
+      if (ghL.length) {
+        ghL[0].pivot.visible = false; ghL[1].pivot.visible = false;
+        ghR[0].pivot.visible = false; ghR[1].pivot.visible = false;
+      }
       glCanvas.style.filter = '';
       camera.position.set(0, 0, z0);
       cardGroup.rotation.set(0, 0, 0);
@@ -1024,6 +1095,8 @@
     }
     phase = 'closed';
     setHint(HINT_DEFAULT, false);
+    sceneEl.style.filter = 'blur(' + SCENE_BLUR0 + 'px)';
+    sceneEl.style.transform = 'scale(1.04)';
 
     // Empfaengername als Live-Textebene (wird nie ins Material eingebrannt)
     cardnameText.textContent = recipient.toUpperCase();
@@ -1039,6 +1112,8 @@
       cardname.style.opacity = 0;
       cardname.style.visibility = 'hidden';
       sceneImg.style.opacity = 1;
+      sceneEl.style.filter = '';
+      sceneEl.style.transform = '';
     }
     if (debugState === 'player') {
       if (renderer) { stopLoop(); glCanvas.style.opacity = 0; }
@@ -1046,6 +1121,8 @@
       cardname.style.opacity = 0;
       cardname.style.visibility = 'hidden';
       sceneImg.style.opacity = 1;
+      sceneEl.style.filter = '';
+      sceneEl.style.transform = '';
       phase = 'flight';
       startSnow();
       veil.style.transition = 'none';
