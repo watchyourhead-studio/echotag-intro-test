@@ -16,16 +16,16 @@
     drawMs: 4000,      // bis alle Linien gezogen sind
     paintAt: 3000,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
     paintMs: 2400,
-    nightAt: 5300,     // ab hier wie v7, Zeiten unten relativ dazu
+    nightAt: 4600,     // ab hier wie v7, Zeiten unten relativ dazu
     darkMs: 3000,      // Abdunkeln Tag -> Nacht
-    lightAt: 1900,     // erste Lichter, noch waehrend es dunkel wird
+    lightAt: 1500,     // erste Lichter, noch waehrend es dunkel wird
     lightMs: 4000,     // bis alle Lichter brennen
-    snowAt: 500,
-    sparkleAt: 6100,   // Eiffelturm glitzert, wenn alle Lichter brennen
+    snowAt: 400,
+    sparkleAt: 5700,   // Eiffelturm glitzert, wenn alle Lichter brennen
     sparkleMs: 6000,   // so lang wie der Glitzer-Sound
     sparkleEvery: 60000,
-    cardAt: 12300,     // Player kommt, wenn die Szene lebt (ab Tippen)
-    voiceAt: 13500
+    cardAt: 11200,     // Player kommt, wenn die Szene lebt (ab Tippen)
+    voiceAt: 12400
   };
 
   var VOL = { music: .45, musicDucked: .16, atmo: .8, atmoDucked: .4, klick: .5, kette: .45, turm: .4 };
@@ -61,16 +61,17 @@
   var timers = [];
   var phase = 'day';
 
+  function easeOut(t) { return 1 - Math.pow(1 - t, 2.2); }
   function ease(t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
-  function tween(key, to, ms, delay) {
+  function tween(key, to, ms, delay, fn) {
     tweens = tweens.filter(function (tw) { return tw.key !== key; });
-    tweens.push({ key: key, from: null, to: to, ms: ms, start: performance.now() + (delay || 0) });
+    tweens.push({ key: key, from: null, to: to, ms: ms, start: performance.now() + (delay || 0), fn: fn || ease });
   }
   function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
   function clearLater() { timers.forEach(clearTimeout); timers = []; }
 
   // ---------- Laden: Knopf erst, wenn Bilder und Musik bereit sind ----------
-  var load = { total: 0, done: 0, shown: 0, armed: false, ready: false };
+  var load = { total: 0, done: 0, shown: 0, armed: false, ready: false, open: false };
   var startCues = document.querySelector('.start-cues');
   var loadRect = document.getElementById('loadRect');
   function trackLoad(weight) {
@@ -83,13 +84,23 @@
   }
   function setReady() {
     load.ready = true;
-    startCues.classList.add('is-ready');
+    // War alles sofort da, wurde die Linie nie gezeigt: Knopf gleich freigeben
+    if (performance.now() < 350) load.shown = 1;
+    // Falls die Animation gedrosselt laeuft (Energiesparmodus), trotzdem freigeben
+    setTimeout(function () { if (!load.open) { load.shown = 1; drawLoad(16); } }, 900);
   }
   function drawLoad(dt) {
-    if (load.ready && load.shown >= .999) return;
+    if (load.open) return;
     var target = load.ready ? 1 : (load.total ? load.done / load.total : 0);
-    load.shown += (target - load.shown) * Math.min(1, dt * .006);
+    load.shown += (target - load.shown) * Math.min(1, dt * (load.ready ? .012 : .006)) + (load.ready ? dt * .0004 : 0);
+    load.shown = Math.min(1, load.shown);
     loadRect.setAttribute('width', String(load.shown * 165));
+    // Knopf erst, wenn die Linie sichtbar am Ende angekommen ist
+    if (load.ready && load.shown >= .995) {
+      load.open = true;
+      if (load.wantOpen) { open(); return; }
+      startCues.classList.add('is-ready');
+    }
   }
   // Notbremse bei sehr langsamem Netz: nach 15 s trotzdem oeffnen lassen
   setTimeout(function () { if (!load.ready) setReady(); }, 15000);
@@ -244,35 +255,164 @@
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(uni.uScale, view.sx, view.sy);
     }
+    snowCanvas.width = canvas.width; snowCanvas.height = canvas.height;
+    css = { w: w, h: h, dpr: dpr };
+    pile.geomAt = 0;
     flakes = [];
-    var n = Math.round(w * h / 5200);
+    var n = Math.round(w * h / 4200);
     for (var i = 0; i < n; i++) flakes.push(newFlake(true));
   }
+  // ---------- Schnee: faellt vor allem, sammelt sich auf dem Player ----------
+  // Rechnet in CSS-Pixeln. Flocken, die die Oberkante des Players treffen, bleiben
+  // liegen; die Haube haelt einen natuerlichen Boeschungswinkel, und was ueber die
+  // Ecken quillt, rutscht in kleinen Klumpen seitlich ab.
+  var snowCanvas = document.getElementById('snow');
+  var sc = snowCanvas.getContext('2d');
+  var css = { w: 1, h: 1, dpr: 1 };
+  var SIN_TILT = Math.sin(.6 * Math.PI / 180);     // Player liegt mit rotate(-.6deg)
+  var BIN = 2, REPOSE = .6, EDGE_HOLD = 3, MAX_H = 16;
+  var pile = { h: null, n: 0, fl: 0, fr: 0, top: 0, right: 0, on: false, spillL: 0, spillR: 0, geomAt: 0 };
+  var chunks = [];
+
   function newFlake(anywhere) {
     var near = Math.random() < .25;
     return {
-      x: Math.random() * fxCanvas.width,
-      y: anywhere ? Math.random() * fxCanvas.height : -10,
-      r: (near ? 1.6 + Math.random() * 1.4 : .7 + Math.random() * .9) * view.dpr,
-      vy: near ? .55 + Math.random() * .35 : .22 + Math.random() * .25,
+      x: Math.random() * css.w,
+      y: anywhere ? Math.random() * css.h : -6,
+      r: near ? 1.3 + Math.random() * 1.2 : .6 + Math.random() * .7,
+      vy: near ? .033 + Math.random() * .02 : .014 + Math.random() * .015,
       sway: Math.random() * 6.28, a: near ? .85 : .55
     };
   }
-  function drawSnow(dt) {
-    if (state.snow <= 0.001) return;
-    fx.fillStyle = '#fff';
-    for (var i = 0; i < flakes.length; i++) {
-      var f = flakes[i];
-      f.y += f.vy * dt * .06 * view.dpr;
-      f.sway += dt * .0012;
-      if (f.y > fxCanvas.height + 10) flakes[i] = f = newFlake(false);
-      fx.globalAlpha = f.a * state.snow;
-      fx.beginPath();
-      fx.arc(f.x + Math.sin(f.sway) * 6, f.y, f.r, 0, 6.2832);
-      fx.fill();
-    }
-    fx.globalAlpha = 1;
+  function cardGeometry(now) {
+    if (now - pile.geomAt < 250) return;
+    pile.geomAt = now;
+    var visible = card.classList.contains('is-in') && parseFloat(getComputedStyle(card).opacity) > .95;
+    if (!visible) { pile.on = false; return; }
+    var r = card.getBoundingClientRect(), s = stage.getBoundingClientRect();
+    var left = r.left - s.left, right = r.right - s.left;
+    pile.top = r.top - s.top;
+    pile.right = right;
+    pile.fl = left + 13;                       // flacher Teil zwischen den runden Ecken
+    pile.fr = right - 13;
+    var n = Math.max(4, Math.round((pile.fr - pile.fl) / BIN));
+    if (!pile.h || pile.n !== n) { pile.h = new Float32Array(n); pile.n = n; }
+    pile.on = true;
   }
+  function edgeY(x) { return pile.top + (pile.right - x) * SIN_TILT + 1.2; }
+  function deposit(x, area, sigma) {
+    var c = (x - pile.fl) / BIN, s2 = 2 * sigma * sigma / (BIN * BIN), sum = 0, i, w = [];
+    for (i = 0; i < pile.n; i++) { w[i] = Math.exp(-(i - c) * (i - c) / s2); sum += w[i]; }
+    for (i = 0; i < pile.n; i++) pile.h[i] = Math.min(MAX_H, pile.h[i] + area / BIN * w[i] / sum);
+  }
+  function spawnChunk(side, area) {
+    var x = side < 0 ? pile.fl - 4 : pile.fr + 4;
+    var k = Math.max(1, Math.round(area / 7));
+    for (var j = 0; j < k; j++) {
+      chunks.push({
+        x: x + side * Math.random() * 3, y: edgeY(x) - 3 - Math.random() * 3,
+        vx: side * (.012 + Math.random() * .03), vy: -.01 + Math.random() * .02,
+        r: 1.1 + Math.random() * 1.6
+      });
+    }
+  }
+  function settlePile(dt) {
+    var h = pile.h, n = pile.n, i, d, m;
+    // Boeschungswinkel: zu steile Stufen rieseln zum Nachbarn
+    for (var pass = 0; pass < 2; pass++) {
+      for (i = 0; i < n - 1; i++) {
+        d = h[i] - h[i + 1];
+        if (d > REPOSE) { m = (d - REPOSE) * .25; h[i] -= m; h[i + 1] += m; }
+        else if (d < -REPOSE) { m = (-d - REPOSE) * .25; h[i] += m; h[i + 1] -= m; }
+      }
+    }
+    // Neuschnee setzt sich: weich ausgleichen, damit eine kissenartige Haube entsteht
+    var k = Math.min(.06, dt * .0012), prev = h[0];
+    for (i = 1; i < n - 1; i++) { var cur = h[i]; h[i] += k * (prev + h[i + 1] - 2 * cur); prev = cur; }
+    // An den runden Ecken haelt nur wenig Schnee; der Rest quillt ueber und rutscht ab
+    if (h[0] > EDGE_HOLD) { m = (h[0] - EDGE_HOLD) * .2; h[0] -= m; pile.spillL += m * BIN; }
+    if (h[n - 1] > EDGE_HOLD) { m = (h[n - 1] - EDGE_HOLD) * .2; h[n - 1] -= m; pile.spillR += m * BIN; }
+    if (pile.spillL > 9) { spawnChunk(-1, pile.spillL); pile.spillL = 0; }
+    if (pile.spillR > 9) { spawnChunk(1, pile.spillR); pile.spillR = 0; }
+    // Wird die Haube zu schwer, gleitet ab und zu ein Stueck an einer Seite ab
+    var avg = 0; for (i = 0; i < n; i++) avg += h[i]; avg /= n;
+    if (avg > 8 && Math.random() < dt * .00025) {
+      var side = Math.random() < .5 ? -1 : 1, span = Math.round(n * (.12 + Math.random() * .12)), lost = 0;
+      for (var j = 0; j < span; j++) {
+        i = side < 0 ? j : n - 1 - j;
+        m = h[i] * (.55 - j / span * .4); h[i] -= m; lost += m * BIN;
+      }
+      spawnChunk(side, lost);
+    }
+  }
+  function drawPile() {
+    var h = pile.h, n = pile.n, i, x, y, top = Infinity;
+    for (i = 0; i < n; i++) if (h[i] > .15) { top = Math.min(top, edgeY(pile.fl + i * BIN) - h[i]); }
+    if (top === Infinity) return;
+    sc.beginPath();
+    sc.moveTo(pile.fl - 3, edgeY(pile.fl - 3));
+    var px = pile.fl, py = edgeY(px) - h[0];
+    sc.lineTo(px, py);
+    for (i = 1; i < n; i++) {
+      x = pile.fl + i * BIN; y = edgeY(x) - h[i];
+      sc.quadraticCurveTo(px, py, (px + x) / 2, (py + y) / 2);
+      px = x; py = y;
+    }
+    sc.lineTo(px, py);
+    sc.lineTo(pile.fr + 3, edgeY(pile.fr + 3));
+    sc.lineTo(pile.fr + 3, edgeY(pile.fr + 3) + 2.2);
+    sc.lineTo(pile.fl - 3, edgeY(pile.fl - 3) + 2.2);
+    sc.closePath();
+    var g = sc.createLinearGradient(0, top, 0, edgeY(pile.fl) + 2);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(.55, '#f4f7fc'); g.addColorStop(1, '#d9e1ee');
+    sc.save();
+    sc.shadowColor = 'rgba(10, 18, 45, .28)'; sc.shadowBlur = 4; sc.shadowOffsetY = 1.5;
+    sc.fillStyle = g; sc.fill();
+    sc.restore();
+  }
+  function drawChunks(dt) {
+    chunks = chunks.filter(function (c) {
+      c.vy += .0009 * dt; c.x += c.vx * dt; c.y += c.vy * dt;
+      sc.beginPath(); sc.arc(c.x, c.y, c.r, 0, 6.2832); sc.fill();
+      return c.y < css.h + 10;
+    });
+  }
+  function drawSnow(dt, now) {
+    sc.setTransform(css.dpr, 0, 0, css.dpr, 0, 0);
+    sc.clearRect(0, 0, css.w, css.h);
+    cardGeometry(now);
+    if (pile.on) {
+      settlePile(dt);
+      // feiner Schneegriesel zwischen den sichtbaren Flocken laesst die Haube stetig wachsen
+      if (Math.random() < dt * .03) deposit(pile.fl + Math.random() * (pile.fr - pile.fl), 2.4, 6);
+      drawPile();
+    }
+    sc.fillStyle = '#fff';
+    drawChunks(dt);
+    if (state.snow <= 0.001) return;
+    for (var i = 0; i < flakes.length; i++) {
+      var f = flakes[i], y0 = f.y;
+      f.y += f.vy * dt;
+      f.sway += dt * .0012;
+      var fx0 = f.x + Math.sin(f.sway) * 6;
+      if (pile.on && fx0 >= pile.fl && fx0 <= pile.fr) {
+        var bi = Math.min(pile.n - 1, Math.max(0, Math.floor((fx0 - pile.fl) / BIN)));
+        var surf = edgeY(fx0) - pile.h[bi];
+        if (f.y >= surf && y0 < surf + 3) {
+          deposit(fx0, f.r * f.r * 16, 5 + f.r * 2);   // Flocke bleibt liegen
+          flakes[i] = newFlake(false);
+          continue;
+        }
+      }
+      if (f.y > css.h + 10) flakes[i] = f = newFlake(false);
+      sc.globalAlpha = f.a * state.snow;
+      sc.beginPath();
+      sc.arc(fx0, f.y, f.r, 0, 6.2832);
+      sc.fill();
+    }
+    sc.globalAlpha = 1;
+  }
+  function clearPile() { if (pile.h) pile.h.fill(0); chunks = []; pile.spillL = pile.spillR = 0; }
   // Wie das echte stuendliche Funkeln: viele kurze weissgoldene Blitze auf dem Turm
   function drawSparkle(dt) {
     if (state.sparkle > 0.01 && towerPts.length) {
@@ -314,7 +454,7 @@
       if (now < tw.start) return true;
       if (tw.from === null) tw.from = state[tw.key];
       var p = Math.min(1, (now - tw.start) / tw.ms);
-      state[tw.key] = tw.from + (tw.to - tw.from) * ease(p);
+      state[tw.key] = tw.from + (tw.to - tw.from) * tw.fn(p);
       return p < 1;
     });
     if (hasGL && texReady === 7) {
@@ -327,7 +467,7 @@
     }
     fx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
     drawSparkle(dt);
-    drawSnow(dt);
+    drawSnow(dt, now);
     drawLoad(dt);
     requestAnimationFrame(frame);
   }
@@ -456,7 +596,7 @@
     later(function () { greeting.classList.add('is-night'); stage.classList.remove('is-day'); }, D);
     if (!hasGL) { later(function () { fallbackNight(true, 3000 * k); }, D); return; }
     var lightDelay = D + (T.lightAt - (fast ? 900 : 0)) * k;
-    tween('dark', 1, T.darkMs * k, D);
+    tween('dark', 1, T.darkMs * k, D, easeOut);
     tween('light', 1.08, T.lightMs * k, lightDelay);
     tween('snow', 1, 2500, D + T.snowAt * k);
     lightSounds(lightDelay, T.lightMs * k);
@@ -491,7 +631,12 @@
   }
 
   function open() {
-    if (phase !== 'day' || taplayer.classList.contains('is-hidden') || !load.ready) return;
+    if (phase !== 'day' || taplayer.classList.contains('is-hidden')) return;
+    if (!load.open) {
+      // Frueh getippt: Ton jetzt im Tap freischalten (iOS), Karte startet von selbst, sobald alles geladen ist
+      if (!load.wantOpen) { load.wantOpen = true; unlockVoice(); if (actx) actx.resume(); }
+      return;
+    }
     taplayer.classList.add('is-hidden');
     unlockVoice();
     if (actx) { actx.resume(); startAmbience(); }
@@ -522,6 +667,7 @@
     wantAmbience = false;
     if (actx) { ramp(bus.music, 0, 2); ramp(bus.atmo, 0, 2); later(function () { stopLoop('musik'); stopLoop('atmo'); }, 2100); }
     tween('snow', 0, 900);
+    clearPile();
     toDay();
     stage.classList.remove('is-day');
     // zurueck aufs leere Papier: erst die Farbe, dann die Linien
