@@ -183,6 +183,9 @@ ImageDraw.Draw(pm).polygon([(x * W, y * H) for x, y in tower], fill=255)
 g = np.asarray(tag.convert('L')).astype(np.int16)
 ys, xs = np.nonzero((g < 165) & (np.asarray(pm) > 0))
 pick = random.sample(range(len(xs)), min(600, len(xs)))
+pts = [[round(xs[i] / W, 4), round(ys[i] / H, 4)] for i in pick]
+# Turmfuesse unten sind in der Nacht hinter den Haeusern: dort kein Funkeln
+pts = [p for p in pts if p[1] < .488 and not (p[0] < .405 and p[1] > .47) and not (p[0] > .515 and p[1] > .47)]
 with open(OUT + 'turm.json', 'w') as f:
-    json.dump([[round(xs[i] / W, 4), round(ys[i] / H, 4)] for i in pick], f, separators=(',', ':'))
+    json.dump(pts, f, separators=(',', ':'))
 print('fertig')

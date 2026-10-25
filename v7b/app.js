@@ -28,7 +28,7 @@
     voiceAt: 12400
   };
 
-  var VOL = { music: .45, musicDucked: .16, atmo: .8, atmoDucked: .4, klick: .5, kette: .45, turm: .4 };
+  var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .45, turm: .4 };
 
   var qs = new URLSearchParams(location.search);
   var recipient = (qs.get('name') || '').replace(/\s+/g, ' ').trim().slice(0, 24);
@@ -384,7 +384,7 @@
     if (pile.on) {
       settlePile(dt);
       // feiner Schneegriesel zwischen den sichtbaren Flocken laesst die Haube stetig wachsen
-      if (Math.random() < dt * .03) deposit(pile.fl + Math.random() * (pile.fr - pile.fl), 2.4, 6);
+      if (Math.random() < dt * .014) deposit(pile.fl + Math.random() * (pile.fr - pile.fl), 2.4, 6);
       drawPile();
     }
     sc.fillStyle = '#fff';
@@ -399,7 +399,7 @@
         var bi = Math.min(pile.n - 1, Math.max(0, Math.floor((fx0 - pile.fl) / BIN)));
         var surf = edgeY(fx0) - pile.h[bi];
         if (f.y >= surf && y0 < surf + 3) {
-          deposit(fx0, f.r * f.r * 16, 5 + f.r * 2);   // Flocke bleibt liegen
+          deposit(fx0, f.r * f.r * 8, 5 + f.r * 2);   // Flocke bleibt liegen
           flakes[i] = newFlake(false);
           continue;
         }
@@ -523,6 +523,9 @@
     stopLoop(name);
     var src = actx.createBufferSource();
     src.buffer = buffers[name]; src.loop = true;
+    // Musik: Intro (11 s) laeuft einmal, danach loopt der Mittelteil nahtlos -
+    // dessen Ende blendet in den eigenen Anfang ueber, auch bei langen Nachrichten
+    if (name === 'musik') { src.loopStart = 11; src.loopEnd = buffers[name].duration; }
     src.connect(bus[busName]); src.start();
     loops[name] = src;
   }
