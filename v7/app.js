@@ -56,11 +56,17 @@
 
   var VS = 'attribute vec2 p; varying vec2 v; void main(){ v = p * .5 + .5; gl_Position = vec4(p, 0., 1.); }';
   var FS = [
+    // highp, wo vorhanden: die Zufalls-Hashes zerfallen sonst auf Handy-GPUs
+    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
+    'precision highp float;',
+    '#else',
     'precision mediump float;',
+    '#endif',
     'varying vec2 v;',
     'uniform sampler2D tDay, tDark, tNight, tMap;',
     'uniform float uDark, uLight, uTime;',
     'uniform vec2 uScale;',
+    'float hash(float n){ return fract(sin(n) * 43758.5453); }',
     'void main(){',
     '  vec2 uv = (v - .5) * uScale + .5; uv.y = 1. - uv.y;',
     '  vec3 day = texture2D(tDay, uv).rgb;',
@@ -79,8 +85,16 @@
     // Kurzes Flackern beim Einschalten, wie eine echte Gluehbirne
     '  float sw = clamp((uLight - m.r) / .05, 0., 1.);',
     '  float fl = sw > 0. && sw < 1. ? step(.35, fract(sin(m.b * 91.7 + uTime * 23.) * 4375.5)) : 1.;',
-    // Lichterkette und Baumlichter funkeln danach ganz leise
-    '  float tw = 1. - m.g * .45 * (.5 + .5 * sin(uTime * (1.6 + m.b * 1.8) + m.b * 6.2832));',
+    // Lichterkette und Baumlichter leben: jedes Licht atmet leise in eigenem
+    // Takt, dimmt ab und zu einzeln ab und flackert minimal
+    '  float sd = m.b * 255.;',
+    '  float br = .5 + .5 * sin(uTime * (.6 + hash(sd) * 1.2) + sd);',
+    '  float s = uTime * (.5 + hash(sd + 1.) * .5) + hash(sd + 2.) * 10.;',
+    '  float ev = step(.72, hash(floor(s) * 13.1 + sd * 7.3));',
+    '  float env = sin(3.14159 * fract(s)); env *= env;',
+    '  float dim = ev * env * (.5 + .4 * hash(floor(s) + sd));',
+    '  float jit = .05 * sin(uTime * 17. + sd * 3.) * sin(uTime * 11.3 + sd);',
+    '  float tw = clamp(1. - m.g * (.2 * br + dim + jit), 0., 1.);',
     '  gl_FragColor = vec4(base + delta * mask * on * fl * tw, 1.);',
     '}'
   ].join('\n');
