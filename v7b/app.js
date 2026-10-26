@@ -1,5 +1,5 @@
 /* EchoTag Day & Night (v7b, mit Zeichnen-Intro)
- * Umschlag mit Wachssiegel -> "Karte oeffnen" -> Siegel bricht, Umschlag oeffnet sich -> die Feder zieht jede Tuschelinie entlang
+ * Umschlag (Intro-Film) -> "Karte oeffnen" -> Umschlag oeffnet sich, Karte kommt heraus -> die Feder zieht jede Tuschelinie entlang
  * ihres Strichs -> Aquarell blueht ein -> Himmel dunkelt von oben ab -> Lichter gehen einzeln an
  * (Cafe, Fenster, dann Lichterkette und Baumlichter, die danach funkeln) ->
  * der Eiffelturm glitzert -> Player. Alles live im WebGL-Shader aus drei
@@ -12,11 +12,11 @@
   };
 
   var T = {
-    drawAt: 3150,       // die Feder setzt an
+    drawAt: 5500,      // die Feder setzt an (nach dem Intro-Film)
     drawMs: 4000,      // bis alle Linien gezogen sind
-    paintAt: 5900,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
+    paintAt: 8250,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
     paintMs: 2400,
-    nightAt: 7500,     // ab hier wie v7, Zeiten unten relativ dazu
+    nightAt: 9850,     // ab hier wie v7, Zeiten unten relativ dazu
     darkMs: 3000,      // Abdunkeln Tag -> Nacht
     lightAt: 1500,     // erste Lichter, noch waehrend es dunkel wird
     lightMs: 4000,     // bis alle Lichter brennen
@@ -24,8 +24,8 @@
     sparkleAt: 5700,   // Eiffelturm glitzert, wenn alle Lichter brennen
     sparkleMs: 6000,   // so lang wie der Glitzer-Sound
     sparkleEvery: 60000,
-    cardAt: 14100,     // Player kommt, wenn die Szene lebt (ab Tippen)
-    voiceAt: 15300
+    cardAt: 16450,     // Player kommt, wenn die Szene lebt (ab Tippen)
+    voiceAt: 17650
   };
 
   var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .45, turm: .4 };
@@ -53,107 +53,31 @@
   var tCur = document.getElementById('tCur');
   var replayBtn = document.getElementById('replayBtn');
   var giftLink = document.getElementById('giftLink');
-  // ---------- Umschlag ----------
-  var env = document.getElementById('env');
-  var envObj = document.getElementById('envObj');
-  var envCard = document.getElementById('envCard');
-  var envFlap = document.getElementById('envFlap');
-  var flapPos = document.getElementById('flapPos');
-  var flapShade = document.getElementById('flapShade');
-  var flapShadow = document.getElementById('flapShadow');
-  var envGeo = {};
-  // Initiale im Wachssiegel: erster Buchstabe des Namens
-  var initial = (recipient.charAt(0) || 'E').toUpperCase();
-  Array.prototype.forEach.call(document.querySelectorAll('.ini'), function (t) { t.textContent = initial; });
-
-  function layoutEnv() {
-    var sw = stage.clientWidth, sh = stage.clientHeight;
-    var W = Math.min(sw * .84, sh * .5), H = W * 1.36;
-    envGeo = { sw: sw, sh: sh, W: W, H: H, left: (sw - W) / 2, top: sh * .53 - H / 2 };
-    envObj.style.left = envGeo.left + 'px'; envObj.style.top = envGeo.top + 'px';
-    envObj.style.width = W + 'px'; envObj.style.height = H + 'px';
-    env.style.setProperty('--W', W + 'px');
+  // ---------- Intro-Film: Umschlag oeffnet sich ----------
+  var intro = document.getElementById('intro');
+  var introVideo = document.getElementById('introVideo');
+  var INTRO_RATE = 1.15;   // Film etwas zuegiger als generiert
+  function playIntro() {
+    introVideo.currentTime = 0;
+    introVideo.playbackRate = INTRO_RATE;
+    var p = introVideo.play();
+    var hide = function () { intro.style.visibility = 'hidden'; };
+    if (p && p.catch) p.catch(function () { intro.style.transition = 'opacity .8s'; intro.style.opacity = 0; setTimeout(hide, 800); });
+    introVideo.onended = hide;
+    // Notbremse, falls 'ended' ausbleibt
+    later(hide, 6400 / INTRO_RATE + 400);
+    // Die Kamera faehrt auf die Karte: Name wird weinrot, bevor das Papier dahinter liegt
+    later(function () { stage.classList.remove('on-table'); }, 3800 / INTRO_RATE);
   }
-  layoutEnv();
-  window.addEventListener('resize', layoutEnv);
-
-  function anim(el, frames, opts) {
-    if (!el.animate) return null;
-    opts.fill = 'forwards';
-    return el.animate(frames, opts);
-  }
-  // Ein paar Wachskruemel springen beim Brechen ab
-  function crumbs() {
-    var g = envGeo;
-    for (var i = 0; i < 7; i++) {
-      var c = document.createElement('div');
-      c.className = 'crumb';
-      c.style.left = (g.W / 2 + (Math.random() - .5) * g.W * .16) + 'px';
-      c.style.top = (g.H * .562 + (Math.random() - .5) * 6) + 'px';
-      envObj.appendChild(c);
-      var dx = (Math.random() - .5) * 70, dy = 120 + Math.random() * 180, rot = (Math.random() - .5) * 540;
-      var a = anim(c, [
-        { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
-        { transform: 'translate(' + dx * .4 + 'px, -' + (8 + Math.random() * 14) + 'px) rotate(' + rot * .3 + 'deg)', opacity: 1, offset: .18 },
-        { transform: 'translate(' + dx + 'px, ' + dy + 'px) rotate(' + rot + 'deg)', opacity: 0 }
-      ], { duration: 750 + Math.random() * 400, easing: 'cubic-bezier(.3, 0, .8, .7)' });
-      (function (el) { setTimeout(function () { el.remove(); }, 1300); })(c);
-    }
-  }
-
-  // Oeffnet den Umschlag; ruft done() auf, wenn die Karte den Bildschirm fuellt
-  function openEnvelope(done) {
-    var g = envGeo;
-    if (!envFlap.animate) { env.style.transition = 'opacity .6s'; env.style.opacity = 0; setTimeout(done, 600); return; }
-    // 1. Siegel bricht: die Lasche zuckt kurz, Kruemel springen ab
-    anim(envFlap, [{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(5deg)' }, { transform: 'rotateX(2deg)' }],
-      { duration: 170, easing: 'ease-out' });
-    crumbs();
-    // 2. Lasche klappt zum Betrachter auf und legt sich nach hinten; Licht wandert mit
-    anim(envFlap, [{ transform: 'rotateX(2deg)' }, { transform: 'rotateX(180deg)' }],
-      { delay: 170, duration: 1050, easing: 'cubic-bezier(.45, .05, .25, 1)' });
-    anim(flapShade, [{ opacity: 0 }, { opacity: .42, offset: .5 }, { opacity: .42 }],
-      { delay: 170, duration: 1050, easing: 'cubic-bezier(.45, .05, .25, 1)' });
-    anim(flapShadow, [{ opacity: 1 }, { opacity: 0 }], { delay: 170, duration: 450, easing: 'ease-out' });
-    // nach dem Senkrechtstand liegt die offene Lasche hinter der Karte
-    setTimeout(function () { flapPos.style.zIndex = 0; }, 170 + 560);
-    // Waehrend die Karte hochfaehrt, liegt sie hinter dem Namen: Name schon weinrot
-    setTimeout(function () { stage.classList.remove('on-table'); }, 1250);
-    // 3. Karte gleitet aus dem Umschlag
-    var lift = g.H * .64;
-    anim(envCard, [{ transform: 'translate(0, 0) scale(1)' }, { transform: 'translate(0, ' + -lift + 'px) scale(1)' }],
-      { delay: 1080, duration: 900, easing: 'cubic-bezier(.22, .7, .25, 1)' });
-    // 4. Umschlag sinkt weg, die Karte kommt nach vorn und fuellt den Bildschirm
-    Array.prototype.forEach.call(envObj.querySelectorAll('.env-sink'), function (el) {
-      anim(el, [{ translate: '0 0', opacity: 1 }, { translate: '0 ' + g.H * .95 + 'px', opacity: 0 }],
-        { delay: 1820, duration: 850, easing: 'cubic-bezier(.55, 0, .8, .4)' });
-    });
-    var cw = g.W * .9, ch = g.H * .794;
-    var cx = g.left + g.W * .05 + cw / 2, cy = g.top + g.H * .166 + ch / 2;
-    var sc = Math.max(g.sw / cw, g.sh / ch) * 1.02;
-    // Die Karte kommt ganz nach vorn, vor Tasche und Lasche
-    setTimeout(function () { envCard.style.zIndex = 10; }, 1940);
-    anim(envCard, [
-      { transform: 'translate(0, ' + -lift + 'px) scale(1)' },
-      { transform: 'translate(' + (g.sw / 2 - cx) + 'px, ' + (g.sh / 2 - cy) + 'px) scale(' + sc + ')' }
-    ], { delay: 1950, duration: 950, easing: 'cubic-bezier(.6, 0, .25, 1)' });
-    anim(envCard.firstChild, [{ opacity: 1 }, { opacity: 0 }], { delay: 2300, duration: 500 });
-    // 5. Unter der Karte liegt dasselbe Papier: Umschlag-Ebene unmerklich ausblenden
-    setTimeout(function () {
-      anim(env, [{ opacity: 1 }, { opacity: 0 }], { duration: 250 });
-      setTimeout(function () { env.style.visibility = 'hidden'; }, 260);
-      done();
-    }, 2920);
-  }
-  function resetEnvelope() {
-    var all = [env].concat(Array.prototype.slice.call(env.querySelectorAll('*')));
-    all.forEach(function (el) { if (el.getAnimations) el.getAnimations().forEach(function (a) { a.cancel(); }); });
-    flapPos.style.zIndex = '';
-    envCard.style.zIndex = '';
-    env.style.visibility = '';
+  function resetIntro() {
+    introVideo.pause();
+    introVideo.currentTime = 0;
+    intro.style.transition = 'none'; intro.style.opacity = 0; intro.style.visibility = '';
     stage.classList.add('on-table');
-    anim(env, [{ opacity: 0 }, { opacity: 1 }], { duration: 800 });
+    void intro.offsetWidth;
+    intro.style.transition = 'opacity .8s ease'; intro.style.opacity = 1;
   }
+
   giftLink.href = CONFIG.giftUrl || '#';
 
   // Animierte Groessen: draw/paint 0..1 (Zeichnen, Malen), dark 0..1 (Tag -> Nacht), light 0..1 (Lichter an)
@@ -601,6 +525,12 @@
       }).catch(tick);
     });
   }
+  // Intro-Film muss abspielbereit sein
+  (function () {
+    var tick = trackLoad(2);
+    if (introVideo.readyState >= 3) tick();
+    else { introVideo.addEventListener('canplaythrough', tick); introVideo.addEventListener('loadeddata', function () { setTimeout(tick, 400); }); introVideo.addEventListener('error', tick); }
+  })();
   load.armed = true;
   checkReady();
   function ramp(node, to, sec) {
@@ -746,8 +676,8 @@
     if (actx) { actx.resume(); startAmbience(); }
     soundBtn.hidden = false;
     soundBtn.classList.add('is-visible');
-    // Umschlag oeffnen: Siegel bricht, Lasche klappt auf, Karte gleitet heraus
-    openEnvelope(function () {});
+    // Intro-Film: Umschlag oeffnet sich, Kamera faehrt auf das Kartenpapier
+    playIntro();
     // Erst zeichnet die Feder, dann laeuft das Aquarell ein, dann wird es Nacht
     tween('draw', 1, T.drawMs, T.drawAt);
     tween('paint', 1, T.paintMs, T.paintAt);
@@ -780,8 +710,8 @@
     later(function () { tween('paint', 0, 1300); }, 2500);
     later(function () { tween('draw', 0, 1000); }, 3500);
     if (!hasGL) later(function () { still.src = 'papier.jpg'; }, 2500);
-    // Umschlag wieder verschlossen auf den Tisch legen
-    later(resetEnvelope, 4500);
+    // Umschlag wieder verschlossen hinlegen
+    later(resetIntro, 4500);
     later(function () { taplayer.classList.remove('is-hidden'); }, 4600);
   }
 
@@ -849,7 +779,7 @@
   // Debug fuer Tests: ?t=night springt direkt in die fertige Nacht, ?t=end zeigt zusaetzlich Player und Verschenken
   if (qs.get('t') === 'night' || qs.get('t') === 'end') {
     state.draw = 1; state.paint = 1; state.dark = 1; state.light = 1.08; state.snow = 1; phase = 'night';
-    env.style.visibility = 'hidden'; stage.classList.remove('on-table');
+    intro.style.visibility = 'hidden'; stage.classList.remove('on-table');
     greeting.classList.add('is-night'); taplayer.classList.add('is-hidden');
     sparkle(800); sparkleLoop();
     if (qs.get('t') === 'end') {

@@ -16,8 +16,8 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preload" href="papier.jpg" as="image">
-<link rel="preload" href="siegel.png" as="image">
-<link rel="stylesheet" href="style.css?v=v7b16">
+<link rel="preload" href="umschlag-start.jpg" as="image">
+<link rel="stylesheet" href="style.css?v=v7b17">
 </head>
 <body>
 <!-- Zeichen-Filter: Tuschelinien zittern leicht, Aquarell franst aus -->
@@ -39,32 +39,10 @@
   <canvas id="gl" aria-hidden="true"></canvas>
   <canvas id="fx" aria-hidden="true"></canvas>
 
-  <!-- Umschlag als Objekt auf dem Tisch: gefuettert, mit Wachssiegel und Karte darin.
-       Beim Oeffnen bricht das Siegel entlang der Laschenkante, die Lasche klappt in 3D auf,
-       die Karte gleitet heraus und wird zur bildschirmfuellenden Zeichenflaeche. -->
-  <div class="env" id="env" aria-hidden="true">
-    <div class="env-obj" id="envObj">
-      <div class="env-sink env-shadow"></div>
-      <div class="env-sink env-back"></div>
-      <div class="env-card" id="envCard"><div class="card-shadow"></div></div>
-      <div class="env-sink env-pocket">
-        <div class="ep-wrap ep-lift"><div class="ep ep-l"></div></div>
-        <div class="ep-wrap ep-lift"><div class="ep ep-r"></div></div>
-        <div class="ep-wrap ep-lift-b"><div class="ep ep-b"></div></div>
-        <div class="flap-shadow" id="flapShadow"><div></div></div>
-        <div class="seal-low"><div class="seal"><img src="siegel.png" alt=""><span class="ini">M</span></div></div>
-      </div>
-      <div class="env-sink flap-pos" id="flapPos">
-        <div class="env-flap" id="envFlap">
-          <div class="flap-face flap-front">
-            <div class="flap-paper"></div>
-            <div class="flap-shade" id="flapShade"></div>
-            <div class="seal"><img src="siegel.png" alt=""><span class="ini">M</span></div>
-          </div>
-          <div class="flap-face flap-back"></div>
-        </div>
-      </div>
-    </div>
+  <!-- Intro-Film: Umschlag oeffnet sich, die Karte kommt heraus, die Kamera faehrt auf das
+       Papier. Das letzte Bild ist das Kartenpapier, auf dem danach die Feder zeichnet. -->
+  <div class="intro" id="intro" aria-hidden="true">
+    <video id="introVideo" src="umschlag.mp4" poster="umschlag-start.jpg" muted playsinline webkit-playsinline="true" preload="auto"></video>
   </div>
 
   <div class="greeting" id="greeting" aria-live="polite">
@@ -148,6 +126,6 @@
 
   <audio id="voice" src="nachricht.mp3" preload="auto"></audio>
 </div>
-<script src="app.js?v=v7b16"></script>
+<script src="app.js?v=v7b17"></script>
 </body>
 </html>

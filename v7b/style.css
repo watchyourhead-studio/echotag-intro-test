@@ -231,65 +231,9 @@ body {
 .time { min-width: 0; font-size: 11.5px; line-height: 1; padding-top: 1px; }
 .after { margin-top: 12px; gap: 6px; }
 
-/* --- Umschlag als Objekt auf dem Tisch (Startbildschirm) --- */
-.env {
-  position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden;
-  background:
-    radial-gradient(ellipse 80% 55% at 50% 50%, rgba(70, 92, 150, .28), rgba(0, 0, 0, 0) 70%),
-    radial-gradient(ellipse at 50% 42%, #1F3160 0%, #14214A 55%, #0A122B 100%);
-}
-.env-obj { position: absolute; perspective: 1100px; perspective-origin: 50% 0; }
-.env-obj > *, .env-pocket > *, .ep-wrap, .ep { position: absolute; inset: 0; }
-/* Papier: dasselbe Kartenpapier, etwas waermer */
-.ep, .flap-paper, .env-card {
-  background: url('papier.jpg') center / calc(var(--W) * 3) auto, #F1E7D8;
-}
-.env-shadow { border-radius: 3px; box-shadow: 0 28px 60px rgba(0, 0, 0, .5), 0 6px 14px rgba(0, 0, 0, .35); background: #E9DDCB; }
-/* Futter innen: weinrotes Papier mit feinem Goldpunkt */
-.env-back, .flap-back {
-  background:
-    radial-gradient(circle at 1.5px 1.5px, rgba(222, 182, 120, .32) 1px, rgba(0, 0, 0, 0) 1.6px) 0 0 / 9px 9px,
-    linear-gradient(#83212B, #5A1219);
-}
-.env-back { box-shadow: inset 0 18px 22px rgba(0, 0, 0, .42); border-radius: 3px; }
-.env-card {
-  left: 5%; width: 90%; top: 16.6%; height: 79.4%; inset: auto; border-radius: 2px;
-  transform-origin: 50% 50%;
-}
-.env-card .card-shadow { position: absolute; inset: 0; box-shadow: 0 2px 8px rgba(40, 20, 10, .25); border-radius: 2px; }
-/* Laschen der Tasche: Seiten unter der Unterlasche, Schatten an den Falzkanten */
-.ep-l { clip-path: polygon(0 0, 50% 53%, 0 100%); }
-.ep-r { clip-path: polygon(100% 0, 50% 53%, 100% 100%); }
-.ep-l::after, .ep-r::after { content: ''; position: absolute; inset: 0; }
-.ep-l::after { background: linear-gradient(to right, rgba(255, 250, 240, .05), rgba(110, 80, 50, .13)); }
-.ep-r::after { background: linear-gradient(to left, rgba(255, 250, 240, .05), rgba(110, 80, 50, .13)); }
-.ep-lift { filter: drop-shadow(0 0 1.5px rgba(70, 45, 25, .25)); }
-.ep-lift-b { filter: drop-shadow(0 -2px 3px rgba(60, 40, 25, .22)); }
-.ep-b { clip-path: polygon(0 100%, 43% 51.5%, 46% 48.6%, 48.5% 47.2%, 50% 46.9%, 51.5% 47.2%, 54% 48.6%, 57% 51.5%, 100% 100%); }
-.ep-b::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(255, 250, 242, .3), rgba(120, 90, 60, .05)); }
-/* Schatten der geschlossenen Lasche auf der Tasche */
-.flap-shadow { filter: blur(5px); }
-.flap-shadow > div { position: absolute; inset: 0; transform: translateY(1.6%); background: rgba(50, 30, 15, .32); clip-path: polygon(0 0, 100% 0, 57% 52%, 54% 55%, 51.5% 56.4%, 50% 56.6%, 48.5% 56.4%, 46% 55%, 43% 52%); }
-.seal-low { clip-path: polygon(0 0, 43% 52%, 46% 55%, 48.5% 56.4%, 50% 56.6%, 51.5% 56.4%, 54% 55%, 57% 52%, 100% 0, 100% 100%, 0 100%); }
-/* Lasche: klappt am oberen Rand als Scharnier zum Betrachter auf */
-.env-flap { position: absolute; inset: 0; transform-origin: 50% 0; transform-style: preserve-3d; }
-.flap-face { position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 57% 52%, 54% 55%, 51.5% 56.4%, 50% 56.6%, 48.5% 56.4%, 46% 55%, 43% 52%); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-.flap-paper, .flap-shade { position: absolute; inset: 0; }
-.flap-paper::after { content: ''; position: absolute; inset: 0; background: linear-gradient(rgba(255, 250, 242, .25), rgba(110, 80, 50, .07) 80%, rgba(110, 80, 50, .12)); }
-.flap-shade { background: #241509; opacity: 0; }
-.flap-back { transform: rotateX(180deg); }
-.flap-back::after { content: ''; position: absolute; inset: 0; background: linear-gradient(rgba(0, 0, 0, .25), rgba(255, 255, 255, .06)); }
-/* Wachssiegel mit eingepraegter Initiale */
-.seal { position: absolute; width: calc(var(--W) * .3); left: calc(50% - var(--W) * .15); top: calc(54% - var(--W) * .143); aspect-ratio: 420 / 400; }
-.seal img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 2px rgba(40, 0, 5, .35)); }
-.ini {
-  position: absolute; inset: 0; display: grid; place-items: center;
-  font-family: 'Jost', sans-serif; font-weight: 500; font-size: calc(var(--W) * .118); line-height: 1;
-  color: #5C1219;
-  text-shadow: -1px -1px 0 rgba(25, 0, 4, .6), 1px 1px 0 rgba(235, 130, 130, .35);
-  padding-bottom: 2%;
-}
-.crumb { position: absolute; width: 5px; height: 4px; border-radius: 45% 55% 50% 40%; background: #6E1820; box-shadow: inset -1px -1px 0 rgba(0, 0, 0, .3); }
+/* --- Intro-Film (Umschlag) --- */
+.intro { position: absolute; inset: 0; z-index: 5; background: #0D1733; pointer-events: none; }
+.intro video { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* Startelemente auf dem dunklen Tisch hell */
 .stage.on-table .greeting { color: #F3E4C8; }
 .stage.on-table .open-btn { color: #F3E4C8; }
@@ -297,11 +241,3 @@ body {
 .stage.on-table .sound-hint { color: rgba(243, 228, 200, .72); }
 .stage.on-table .loading-text { color: rgba(243, 228, 200, .8); }
 .stage.on-table .ll-base, .stage.on-table .ll-ink { stroke: #F3E4C8; }
-/* Die Perspektive muss am direkten Elternteil der klappenden Lasche sitzen */
-.flap-pos { perspective: 1100px; perspective-origin: 50% 0; }
-/* Feste Ebenen: Schatten < Futter < Karte < Tasche < Lasche (offen: hinter dem Futter) */
-.env-shadow { z-index: 1; }
-.env-back { z-index: 2; }
-.env-card { z-index: 3; }
-.env-pocket { z-index: 4; }
-.flap-pos { z-index: 5; }
