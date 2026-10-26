@@ -1,5 +1,5 @@
 /* EchoTag Day & Night (v7b, mit Zeichnen-Intro)
- * Umschlag (Intro-Film) -> "Karte oeffnen" -> Umschlag oeffnet sich, Karte kommt heraus -> die Feder zieht jede Tuschelinie entlang
+ * Umschlag (zwei Papiertueren) -> "Karte oeffnen" -> die Tueren schwingen auf, dahinter zieht die Feder schon jede Tuschelinie entlang
  * ihres Strichs -> Aquarell blueht ein -> Himmel dunkelt von oben ab -> Lichter gehen einzeln an
  * (Cafe, Fenster, dann Lichterkette und Baumlichter, die danach funkeln) ->
  * der Eiffelturm glitzert -> Player. Alles live im WebGL-Shader aus drei
@@ -12,11 +12,11 @@
   };
 
   var T = {
-    drawAt: 5500,      // die Feder setzt an (nach dem Intro-Film)
+    drawAt: 500,       // die Feder setzt an, waehrend die Tueren aufgehen
     drawMs: 4000,      // bis alle Linien gezogen sind
-    paintAt: 8250,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
+    paintAt: 3250,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
     paintMs: 2400,
-    nightAt: 9850,     // ab hier wie v7, Zeiten unten relativ dazu
+    nightAt: 4850,     // ab hier wie v7, Zeiten unten relativ dazu
     darkMs: 3000,      // Abdunkeln Tag -> Nacht
     lightAt: 1500,     // erste Lichter, noch waehrend es dunkel wird
     lightMs: 4000,     // bis alle Lichter brennen
@@ -24,8 +24,8 @@
     sparkleAt: 5700,   // Eiffelturm glitzert, wenn alle Lichter brennen
     sparkleMs: 6000,   // so lang wie der Glitzer-Sound
     sparkleEvery: 60000,
-    cardAt: 16450,     // Player kommt, wenn die Szene lebt (ab Tippen)
-    voiceAt: 17650
+    cardAt: 11450,     // Player kommt, wenn die Szene lebt (ab Tippen)
+    voiceAt: 12650
   };
 
   var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .45, turm: .4 };
@@ -53,29 +53,68 @@
   var tCur = document.getElementById('tCur');
   var replayBtn = document.getElementById('replayBtn');
   var giftLink = document.getElementById('giftLink');
-  // ---------- Intro-Film: Umschlag oeffnet sich ----------
+  // ---------- Umschlag: zwei Papiertueren schwingen zur Kamera auf ----------
+  // Die Tueren haengen an den Bildraendern; ab etwa 90 Grad sind sie aus dem Bild.
   var intro = document.getElementById('intro');
-  var introVideo = document.getElementById('introVideo');
-  var INTRO_RATE = 1.15;   // Film etwas zuegiger als generiert
+  var introShade = document.getElementById('introShade');
+  var doors = ['doorL', 'doorR'].map(function (id, i) {
+    var el = document.getElementById(id);
+    return { el: el, dim: el.querySelector('.dim'), dir: i ? 1 : -1 };
+  });
+  var DOOR = { deg: 100, openMs: 2300, closeMs: 1700, lag: 160 };   // die rechte Tuer liegt oben und geht zuerst
+  var doorRaf = 0;
+  function fitIntro() { intro.style.perspective = Math.round(stage.clientWidth * 1.7) + 'px'; }
+  fitIntro();
+  window.addEventListener('resize', fitIntro);
+  function easeDoor(t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  function setDoor(d, p) {
+    var deg = DOOR.deg * p, rad = deg * Math.PI / 180;
+    d.el.style.transform = 'rotateY(' + (d.dir * deg).toFixed(2) + 'deg)';
+    // Licht von vorn: je steiler die Tuer steht, desto dunkler ihre Flaeche
+    d.dim.style.opacity = (Math.sin(rad) * .38 + (1 - Math.cos(rad)) * .2).toFixed(3);
+    d.el.style.setProperty('--edge', Math.min(1, Math.sin(rad) * 3).toFixed(3));
+  }
+  function setDoors(pl, pr) {
+    setDoor(doors[0], pl); setDoor(doors[1], pr);
+    doors[0].el.style.setProperty('--seam', Math.max(0, 1 - pr * 6).toFixed(3));
+    // Schatten der Tuerkanten auf dem Papier: wo die Kante im Bild steht (mit Perspektive),
+    // dunkel direkt daneben, weicher und heller, je hoeher die Tuer steht
+    var w = stage.clientWidth, P = w * 1.7, half = w / 2;
+    var edge = function (p) {
+      var rad = DOOR.deg * p * Math.PI / 180, x = half * Math.cos(rad), z = half * Math.sin(rad);
+      return half - (half - x) * P / (P - z);   // Abstand der Kante vom eigenen Bildrand
+    };
+    var xl = edge(pl), xr = w - edge(pr), p = Math.min(pl, pr);
+    var a = .5 * Math.pow(1 - Math.min(1, p * 1.15), 1.3), spread = 14 + 150 * p;
+    var c = 'rgba(58, 34, 22, ';
+    introShade.style.opacity = 1;
+    introShade.style.background = 'linear-gradient(90deg, ' + c + a.toFixed(3) + ') ' + xl.toFixed(1) + 'px, ' + c + '0) ' + (xl + spread).toFixed(1) + 'px, ' +
+      c + '0) ' + (xr - spread).toFixed(1) + 'px, ' + c + a.toFixed(3) + ') ' + xr.toFixed(1) + 'px)';
+  }
+  function swingDoors(from, to, ms, done) {
+    cancelAnimationFrame(doorRaf);
+    var opening = to > from, t0 = performance.now();
+    var lagL = opening ? DOOR.lag : 0, lagR = opening ? 0 : DOOR.lag;
+    (function step(now) {
+      var k = function (lag) { var t = Math.min(1, Math.max(0, (now - t0 - lag) / ms)); return from + (to - from) * easeDoor(t); };
+      setDoors(k(lagL), k(lagR));
+      if (now - t0 < ms + DOOR.lag) doorRaf = requestAnimationFrame(step);
+      else if (done) done();
+    })(t0);
+  }
+  setDoors(0, 0);
   function playIntro() {
-    introVideo.currentTime = 0;
-    introVideo.playbackRate = INTRO_RATE;
-    var p = introVideo.play();
-    var hide = function () { intro.style.visibility = 'hidden'; };
-    if (p && p.catch) p.catch(function () { intro.style.transition = 'opacity .8s'; intro.style.opacity = 0; setTimeout(hide, 800); });
-    introVideo.onended = hide;
-    // Notbremse, falls 'ended' ausbleibt
-    later(hide, 6400 / INTRO_RATE + 400);
-    // Die Kamera faehrt auf die Karte: Name wird weinrot, bevor das Papier dahinter liegt
-    later(function () { stage.classList.remove('on-table'); }, 3800 / INTRO_RATE);
+    intro.style.visibility = '';
+    stage.classList.remove('on-table');
+    var hide = function () { cancelAnimationFrame(doorRaf); setDoors(1, 1); intro.style.visibility = 'hidden'; };
+    swingDoors(0, 1, DOOR.openMs, hide);
+    // Notbremse, falls der Browser keine Animationsbilder liefert
+    later(hide, DOOR.openMs + DOOR.lag + 400);
   }
   function resetIntro() {
-    introVideo.pause();
-    introVideo.currentTime = 0;
-    intro.style.transition = 'none'; intro.style.opacity = 0; intro.style.visibility = '';
+    intro.style.visibility = '';
     stage.classList.add('on-table');
-    void intro.offsetWidth;
-    intro.style.transition = 'opacity .8s ease'; intro.style.opacity = 1;
+    swingDoors(1, 0, DOOR.closeMs);
   }
 
   giftLink.href = CONFIG.giftUrl || '#';
@@ -525,11 +564,11 @@
       }).catch(tick);
     });
   }
-  // Intro-Film muss abspielbereit sein
+  // Das Tuerpapier muss da sein, bevor jemand den Umschlag sieht
   (function () {
-    var tick = trackLoad(2);
-    if (introVideo.readyState >= 3) tick();
-    else { introVideo.addEventListener('canplaythrough', tick); introVideo.addEventListener('loadeddata', function () { setTimeout(tick, 400); }); introVideo.addEventListener('error', tick); }
+    var tick = trackLoad(.5), img = new Image();
+    img.onload = img.onerror = tick;
+    img.src = 'tuer.jpg';
   })();
   load.armed = true;
   checkReady();
@@ -676,7 +715,7 @@
     if (actx) { actx.resume(); startAmbience(); }
     soundBtn.hidden = false;
     soundBtn.classList.add('is-visible');
-    // Intro-Film: Umschlag oeffnet sich, Kamera faehrt auf das Kartenpapier
+    // Die Tueren schwingen auf, dahinter setzt die Feder schon an
     playIntro();
     // Erst zeichnet die Feder, dann laeuft das Aquarell ein, dann wird es Nacht
     tween('draw', 1, T.drawMs, T.drawAt);
@@ -712,7 +751,7 @@
     if (!hasGL) later(function () { still.src = 'papier.jpg'; }, 2500);
     // Umschlag wieder verschlossen hinlegen
     later(resetIntro, 4500);
-    later(function () { taplayer.classList.remove('is-hidden'); }, 4600);
+    later(function () { taplayer.classList.remove('is-hidden'); }, 4500 + DOOR.closeMs + DOOR.lag);
   }
 
   taplayer.addEventListener('click', open);

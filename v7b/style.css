@@ -231,13 +231,27 @@ body {
 .time { min-width: 0; font-size: 11.5px; line-height: 1; padding-top: 1px; }
 .after { margin-top: 12px; gap: 6px; }
 
-/* --- Intro-Film (Umschlag) --- */
-.intro { position: absolute; inset: 0; z-index: 5; background: #0D1733; pointer-events: none; }
-.intro video { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* Startelemente auf dem dunklen Tisch hell */
-.stage.on-table .greeting { color: #F3E4C8; }
-.stage.on-table .open-btn { color: #F3E4C8; }
-.stage.on-table .open-edge rect { stroke: #F3E4C8; }
-.stage.on-table .sound-hint { color: rgba(243, 228, 200, .72); }
-.stage.on-table .loading-text { color: rgba(243, 228, 200, .8); }
-.stage.on-table .ll-base, .stage.on-table .ll-ink { stroke: #F3E4C8; }
+/* --- Umschlag: zwei Papiertueren, die in 3D aufschwingen --- */
+.intro { position: absolute; inset: 0; z-index: 5; pointer-events: none; perspective: 700px; perspective-origin: 50% 50%; }
+/* Schatten der Tueren auf dem Kartenpapier: dunkel, solange sie noch nah darueber stehen */
+.intro-shade {
+  position: absolute; inset: 0;
+}
+.door { position: absolute; top: 0; width: 50%; height: 100%; will-change: transform; }
+.door-l { left: 0; transform-origin: 0 50%; }
+.door-r { right: 0; transform-origin: 100% 50%; }
+.face { position: absolute; inset: 0; overflow: hidden; }
+.front { background: #F0E5D8 url('tuer.jpg') 0 0 / 200% 100% no-repeat; }
+.door-r .front { background-position: 100% 0; }
+/* Papierkante an der Naht: fängt Licht, sobald die Tuer sich hebt */
+.front::after { content: ''; position: absolute; top: 0; bottom: 0; width: 1.5px; background: rgba(255, 250, 240, .7); opacity: var(--edge, 0); }
+.door-l .front::after { right: 0; }
+.door-r .front::after { left: 0; }
+.dim { position: absolute; inset: 0; opacity: 0; }
+/* Die Tuer kippt aus dem Licht: am Scharnier dunkler, die Kante zur Kamera bleibt heller */
+.door-l .dim { background: linear-gradient(90deg, rgba(42, 24, 16, .9), rgba(42, 24, 16, .35)); }
+.door-r .dim { background: linear-gradient(270deg, rgba(42, 24, 16, .9), rgba(42, 24, 16, .35)); }
+/* Naht: die rechte Tuer liegt oben, ihre Kante wirft einen feinen Schatten auf die linke */
+.front::before { content: ''; position: absolute; top: 0; bottom: 0; }
+.door-l .front::before { right: 0; width: 9px; background: linear-gradient(to left, rgba(92, 62, 40, .3), rgba(92, 62, 40, .1) 35%, rgba(92, 62, 40, 0)); opacity: var(--seam, 1); }
+.door-r .front::before { left: 0; width: 1px; background: rgba(120, 88, 62, .45); }

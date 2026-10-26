@@ -16,8 +16,8 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preload" href="papier.jpg" as="image">
-<link rel="preload" href="umschlag-start.jpg" as="image">
-<link rel="stylesheet" href="style.css?v=v7b17">
+<link rel="preload" href="tuer.jpg" as="image">
+<link rel="stylesheet" href="style.css?v=v7b18">
 </head>
 <body>
 <!-- Zeichen-Filter: Tuschelinien zittern leicht, Aquarell franst aus -->
@@ -39,10 +39,12 @@
   <canvas id="gl" aria-hidden="true"></canvas>
   <canvas id="fx" aria-hidden="true"></canvas>
 
-  <!-- Intro-Film: Umschlag oeffnet sich, die Karte kommt heraus, die Kamera faehrt auf das
-       Papier. Das letzte Bild ist das Kartenpapier, auf dem danach die Feder zeichnet. -->
+  <!-- Umschlag: zwei Tueren aus Papier, die in 3D aufschwingen. Dahinter liegt schon die Buehne,
+       die Feder zeichnet, waehrend die Tueren noch aufgehen. -->
   <div class="intro" id="intro" aria-hidden="true">
-    <video id="introVideo" src="umschlag.mp4" poster="umschlag-start.jpg" muted playsinline webkit-playsinline="true" preload="auto"></video>
+    <div class="intro-shade" id="introShade"></div>
+    <div class="door door-l" id="doorL"><div class="face front"><i class="dim"></i></div></div>
+    <div class="door door-r" id="doorR"><div class="face front"><i class="dim"></i></div></div>
   </div>
 
   <div class="greeting" id="greeting" aria-live="polite">
@@ -126,6 +128,6 @@
 
   <audio id="voice" src="nachricht.mp3" preload="auto"></audio>
 </div>
-<script src="app.js?v=v7b17"></script>
+<script src="app.js?v=v7b18"></script>
 </body>
 </html>
