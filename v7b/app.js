@@ -1,5 +1,5 @@
 /* EchoTag Day & Night (v7b, mit Zeichnen-Intro)
- * Umschlag (zwei Papiertueren) -> "Karte oeffnen" -> die Tueren schwingen auf, dahinter zieht die Feder schon jede Tuschelinie entlang
+ * Umschlag (zwei Papiertueren mit Siegel) -> Tippen -> die Tueren schwingen auf, dahinter steht der Name, die Feder zieht schon jede Tuschelinie entlang
  * ihres Strichs -> Aquarell blueht ein -> Himmel dunkelt von oben ab -> Lichter gehen einzeln an
  * (Cafe, Fenster, dann Lichterkette und Baumlichter, die danach funkeln) ->
  * der Eiffelturm glitzert -> Player. Alles live im WebGL-Shader aus drei
@@ -12,11 +12,11 @@
   };
 
   var T = {
-    drawAt: 500,       // die Feder setzt an, waehrend die Tueren aufgehen
+    drawAt: 1100,      // die Feder setzt an, wenn der Name frei ist und die Tueren noch aufgehen
     drawMs: 4000,      // bis alle Linien gezogen sind
-    paintAt: 3250,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
+    paintAt: 3850,     // Aquarell laeuft ein, waehrend die letzten Linien entstehen
     paintMs: 2400,
-    nightAt: 4850,     // ab hier wie v7, Zeiten unten relativ dazu
+    nightAt: 5450,     // ab hier wie v7, Zeiten unten relativ dazu
     darkMs: 3000,      // Abdunkeln Tag -> Nacht
     lightAt: 1500,     // erste Lichter, noch waehrend es dunkel wird
     lightMs: 4000,     // bis alle Lichter brennen
@@ -24,11 +24,11 @@
     sparkleAt: 5700,   // Eiffelturm glitzert, wenn alle Lichter brennen
     sparkleMs: 6000,   // so lang wie der Glitzer-Sound
     sparkleEvery: 60000,
-    cardAt: 11450,     // Player kommt, wenn die Szene lebt (ab Tippen)
-    voiceAt: 12650
+    cardAt: 12050,     // Player kommt, wenn die Szene lebt (ab Tippen)
+    voiceAt: 13250
   };
 
-  var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .45, turm: .4 };
+  var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .45, turm: .4, papier: .8 };
 
   var qs = new URLSearchParams(location.search);
   var recipient = (qs.get('name') || '').replace(/\s+/g, ' ').trim().slice(0, 24);
@@ -61,8 +61,9 @@
     var el = document.getElementById(id);
     return { el: el, dim: el.querySelector('.dim'), dir: i ? 1 : -1 };
   });
-  var DOOR = { deg: 100, openMs: 2300, closeMs: 1700, lag: 160 };   // die rechte Tuer liegt oben und geht zuerst
-  var doorRaf = 0;
+  var seal = document.getElementById('seal');
+  var DOOR = { deg: 100, crack: .035, crackMs: 240, openMs: 2300, closeMs: 1700, lag: 160 };   // die rechte Tuer liegt oben und geht zuerst
+  var doorRaf = 0, doorBusy = false, doorAt = [0, 0];
   function fitIntro() { intro.style.perspective = Math.round(stage.clientWidth * 1.7) + 'px'; }
   fitIntro();
   window.addEventListener('resize', fitIntro);
@@ -71,10 +72,13 @@
     var deg = DOOR.deg * p, rad = deg * Math.PI / 180;
     d.el.style.transform = 'rotateY(' + (d.dir * deg).toFixed(2) + 'deg)';
     // Licht von vorn: je steiler die Tuer steht, desto dunkler ihre Flaeche
-    d.dim.style.opacity = (Math.sin(rad) * .38 + (1 - Math.cos(rad)) * .2).toFixed(3);
+    var dim = Math.sin(rad) * .38 + (1 - Math.cos(rad)) * .2;
+    d.dim.style.opacity = dim.toFixed(3);
     d.el.style.setProperty('--edge', Math.min(1, Math.sin(rad) * 3).toFixed(3));
+    if (d.dir > 0) seal.style.setProperty('--lit', (1 - dim * .7).toFixed(3));
   }
   function setDoors(pl, pr) {
+    doorAt = [pl, pr];
     setDoor(doors[0], pl); setDoor(doors[1], pr);
     doors[0].el.style.setProperty('--seam', Math.max(0, 1 - pr * 6).toFixed(3));
     // Schatten der Tuerkanten auf dem Papier: wo die Kante im Bild steht (mit Perspektive),
@@ -87,35 +91,50 @@
     var xl = edge(pl), xr = w - edge(pr), p = Math.min(pl, pr);
     var a = .5 * Math.pow(1 - Math.min(1, p * 1.15), 1.3), spread = 14 + 150 * p;
     var c = 'rgba(58, 34, 22, ';
-    introShade.style.opacity = 1;
     introShade.style.background = 'linear-gradient(90deg, ' + c + a.toFixed(3) + ') ' + xl.toFixed(1) + 'px, ' + c + '0) ' + (xl + spread).toFixed(1) + 'px, ' +
       c + '0) ' + (xr - spread).toFixed(1) + 'px, ' + c + a.toFixed(3) + ') ' + xr.toFixed(1) + 'px)';
   }
-  function swingDoors(from, to, ms, done) {
+  // Beide Tueren vom jetzigen Stand nach 'to'; beim Oeffnen fuehrt die rechte, beim Schliessen die linke
+  function swingDoors(to, ms, lag, done) {
     cancelAnimationFrame(doorRaf);
-    var opening = to > from, t0 = performance.now();
-    var lagL = opening ? DOOR.lag : 0, lagR = opening ? 0 : DOOR.lag;
+    doorBusy = true;
+    var from = doorAt.slice(), opening = to > Math.max(from[0], from[1]), t0 = performance.now();
+    var lags = opening ? [lag, 0] : [0, lag];
     (function step(now) {
-      var k = function (lag) { var t = Math.min(1, Math.max(0, (now - t0 - lag) / ms)); return from + (to - from) * easeDoor(t); };
-      setDoors(k(lagL), k(lagR));
-      if (now - t0 < ms + DOOR.lag) doorRaf = requestAnimationFrame(step);
-      else if (done) done();
+      var k = function (i) { var t = Math.min(1, Math.max(0, (now - t0 - lags[i]) / ms)); return from[i] + (to - from[i]) * easeDoor(t); };
+      setDoors(k(0), k(1));
+      if (now - t0 < ms + lag) doorRaf = requestAnimationFrame(step);
+      else { doorBusy = false; if (done) done(); }
     })(t0);
   }
   setDoors(0, 0);
   function playIntro() {
     intro.style.visibility = '';
-    stage.classList.remove('on-table');
-    var hide = function () { cancelAnimationFrame(doorRaf); setDoors(1, 1); intro.style.visibility = 'hidden'; };
-    swingDoors(0, 1, DOOR.openMs, hide);
+    stage.classList.add('is-opened');
+    var hide = function () { cancelAnimationFrame(doorRaf); doorBusy = false; setDoors(1, 1); intro.style.visibility = 'hidden'; };
+    // Erst loest sich das Papier einen Spalt, dann schwingen die Tueren auf
+    swingDoors(DOOR.crack, DOOR.crackMs, 40, function () { swingDoors(1, DOOR.openMs, DOOR.lag, hide); });
+    sfx('papier', VOL.papier, DOOR.crackMs);
     // Notbremse, falls der Browser keine Animationsbilder liefert
-    later(hide, DOOR.openMs + DOOR.lag + 400);
+    later(hide, DOOR.crackMs + DOOR.openMs + DOOR.lag + 500);
   }
   function resetIntro() {
     intro.style.visibility = '';
-    stage.classList.add('on-table');
-    swingDoors(1, 0, DOOR.closeMs);
+    swingDoors(0, DOOR.closeMs, DOOR.lag, function () { stage.classList.remove('is-opened'); });
   }
+  // Im Ruhezustand heben sich die Tueren ab und zu kaum merklich: "ich gehe auf"
+  var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setInterval(function () {
+    if (calm || !load.open || doorBusy || phase !== 'day' || taplayer.classList.contains('is-hidden') || stage.classList.contains('is-pressed')) return;
+    swingDoors(.014, 520, 90, function () { swingDoors(0, 700, 90); });
+  }, 5200);
+  // Druckgefuehl: das Siegel gibt nach, auf Android ein kurzer Impuls
+  function press(on) {
+    stage.classList.toggle('is-pressed', on);
+    if (on && load.open && navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+  }
+  taplayer.addEventListener('pointerdown', function () { press(true); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { taplayer.addEventListener(ev, function () { setTimeout(function () { press(false); }, 90); }); });
 
   giftLink.href = CONFIG.giftUrl || '#';
 
@@ -162,6 +181,7 @@
     // Knopf erst, wenn die Linie sichtbar am Ende angekommen ist
     if (load.ready && load.shown >= .995) {
       load.open = true;
+      stage.classList.add('is-ready');   // Siegel erscheint
       if (load.wantOpen) { open(); return; }
       startCues.classList.add('is-ready');
     }
@@ -551,7 +571,7 @@
     bus.master = actx.createGain(); bus.master.connect(actx.destination);
     ['music', 'atmo', 'sfx'].forEach(function (k) { bus[k] = actx.createGain(); bus[k].gain.value = 0; bus[k].connect(bus.master); });
     bus.sfx.gain.value = 1;
-    ['musik', 'atmo', 'klick', 'kette', 'turm'].forEach(function (n) {
+    ['musik', 'atmo', 'klick', 'kette', 'turm', 'papier'].forEach(function (n) {
       var tick = trackLoad(n === 'musik' ? 4 : n === 'atmo' ? .6 : .2);
       fetch('audio/' + n + '.mp3').then(function (r) { return r.arrayBuffer(); }).then(function (data) {
         // Safari kennt nur die Callback-Form
@@ -818,7 +838,7 @@
   // Debug fuer Tests: ?t=night springt direkt in die fertige Nacht, ?t=end zeigt zusaetzlich Player und Verschenken
   if (qs.get('t') === 'night' || qs.get('t') === 'end') {
     state.draw = 1; state.paint = 1; state.dark = 1; state.light = 1.08; state.snow = 1; phase = 'night';
-    intro.style.visibility = 'hidden'; stage.classList.remove('on-table');
+    intro.style.visibility = 'hidden'; stage.classList.add('is-opened');
     greeting.classList.add('is-night'); taplayer.classList.add('is-hidden');
     sparkle(800); sparkleLoop();
     if (qs.get('t') === 'end') {
