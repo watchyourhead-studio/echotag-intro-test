@@ -246,13 +246,28 @@ body {
 .front::before { content: ''; position: absolute; top: 0; bottom: 0; }
 .door-l .front::before { right: 0; width: var(--seamW, 9px); background: linear-gradient(to left, rgba(92, 62, 40, .32), rgba(92, 62, 40, .12) 35%, rgba(92, 62, 40, 0)); opacity: var(--seam, 1); }
 .door-r .front::before { left: 0; width: 1px; background: rgba(120, 88, 62, .45); }
-/* Siegel: klebt an der rechten Tuer und ragt ueber die Naht; erscheint, wenn alles geladen ist */
+/* Siegel: klebt an der rechten Tuer und ragt ueber die Naht; erscheint, wenn alles geladen ist.
+   Das Wachs ist ein Stapel aus Schichten (je 0,5px, zusammen 8px), die unteren dunkler: so zeigt es seine Dicke,
+   sobald die Tuer kippt. Filter nur auf den Schichten, am Stapel wuerde er die 3D-Ebene plaetten. */
 .seal {
-  position: absolute; left: 0; top: 50%; width: calc(var(--sw) * .23); height: auto;
+  position: absolute; left: 0; top: 50%; width: calc(var(--sw) * .23); aspect-ratio: 1;
   transform: translate(-50%, -50%) scale(var(--press, 1));
-  filter: brightness(var(--lit, 1)) drop-shadow(0 calc(var(--sh, 1) * 3px) calc(var(--sh, 1) * 5px) rgba(70, 24, 18, .38));
+  transform-style: preserve-3d;
   opacity: 0; transition: opacity .8s ease, transform .16s ease;
-  pointer-events: none; user-select: none; -webkit-user-drag: none;
+  pointer-events: none;
 }
+.seal img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  transform: translateZ(calc(var(--z) * .5px));
+  filter: brightness(calc(var(--lit, 1) * (.5 + var(--z) * .0225)));
+  user-select: none; -webkit-user-drag: none;
+}
+.seal img:last-child { filter: brightness(var(--lit, 1)); }
+.seal img:first-child { filter: brightness(calc(var(--lit, 1) * .45)) drop-shadow(0 calc(var(--sh, 1) * 5px) calc(var(--sh, 1) * 7px) rgba(70, 24, 18, .42)); }
 .stage.is-ready .seal { opacity: 1; }
 .stage.is-pressed .seal { --press: .955; --sh: .35; }
+/* Papierdicke: eine schmale Kantenflaeche an der Naht, die nach unten zur Karte zeigt */
+.door { transform-style: preserve-3d; }
+.edge { position: absolute; top: 0; bottom: 0; width: 4px; background: linear-gradient(90deg, #E6D8C4, #D3C2AA); }
+.door-l .edge { left: 100%; transform-origin: 0 50%; transform: rotateY(90deg); }
+.door-r .edge { right: 100%; transform-origin: 100% 50%; transform: rotateY(-90deg); }

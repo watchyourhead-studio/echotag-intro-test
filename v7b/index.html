@@ -18,7 +18,7 @@
 <link rel="preload" href="papier.jpg" as="image">
 <link rel="preload" href="tuer.jpg" as="image">
 <link rel="preload" href="siegel.png" as="image">
-<link rel="stylesheet" href="style.css?v=v7b20">
+<link rel="stylesheet" href="style.css?v=v7b21">
 </head>
 <body>
 <!-- Zeichen-Filter: Tuschelinien zittern leicht, Aquarell franst aus -->
@@ -41,11 +41,12 @@
   <canvas id="fx" aria-hidden="true"></canvas>
 
   <!-- Umschlag: zwei Tueren aus Papier, die in 3D aufschwingen; das Siegel klebt an der rechten.
+       Papier und Siegel haben echte Dicke (Kantenflaeche, Wachs aus gestapelten Schichten).
        Dahinter liegt schon die Buehne mit dem Namen, die Feder zeichnet, waehrend die Tueren noch aufgehen. -->
   <div class="intro" id="intro" aria-hidden="true">
     <div class="intro-shade" id="introShade"></div>
-    <div class="door door-l" id="doorL"><div class="face front"><i class="dim"></i></div></div>
-    <div class="door door-r" id="doorR"><div class="face front"><i class="dim"></i></div><img class="seal" id="seal" src="siegel.png" alt=""></div>
+    <div class="door door-l" id="doorL"><div class="face front"><i class="dim"></i></div><i class="edge"></i></div>
+    <div class="door door-r" id="doorR"><div class="face front"><i class="dim"></i></div><i class="edge"></i><div class="seal" id="seal"><img src="siegel.png" alt="" style="--z:0"><img src="siegel.png" alt="" style="--z:1"><img src="siegel.png" alt="" style="--z:2"><img src="siegel.png" alt="" style="--z:3"><img src="siegel.png" alt="" style="--z:4"><img src="siegel.png" alt="" style="--z:5"><img src="siegel.png" alt="" style="--z:6"><img src="siegel.png" alt="" style="--z:7"><img src="siegel.png" alt="" style="--z:8"><img src="siegel.png" alt="" style="--z:9"><img src="siegel.png" alt="" style="--z:10"><img src="siegel.png" alt="" style="--z:11"><img src="siegel.png" alt="" style="--z:12"><img src="siegel.png" alt="" style="--z:13"><img src="siegel.png" alt="" style="--z:14"><img src="siegel.png" alt="" style="--z:15"><img src="siegel.png" alt="" style="--z:16"></div></div>
   </div>
 
   <div class="greeting" id="greeting" aria-live="polite">
@@ -123,6 +124,6 @@
 
   <audio id="voice" src="nachricht.mp3" preload="auto"></audio>
 </div>
-<script src="app.js?v=v7b20"></script>
+<script src="app.js?v=v7b21"></script>
 </body>
 </html>
