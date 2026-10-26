@@ -62,7 +62,9 @@
     return { el: el, dim: el.querySelector('.dim'), dir: i ? 1 : -1 };
   });
   var seal = document.getElementById('seal');
-  var DOOR = { deg: 100, crack: .035, crackMs: 240, openMs: 2300, closeMs: 1700, lag: 160 };   // die rechte Tuer liegt oben und geht zuerst
+  var DOOR = { deg: 100, crack: [.07, .1], crackMs: 240, openMs: 2300, closeMs: 1700, lag: 160 };   // die rechte Tuer liegt oben und geht zuerst
+  // Dickes Papier liegt nie ganz flach: in Ruhe stehen die Tueren an der Naht etwas hoch
+  var REST = [.03, .05], TEASE = [.09, .13];
   var doorRaf = 0, doorBusy = false, doorAt = [0, 0];
   function fitIntro() { intro.style.perspective = Math.round(stage.clientWidth * 1.7) + 'px'; }
   fitIntro();
@@ -80,7 +82,11 @@
   function setDoors(pl, pr) {
     doorAt = [pl, pr];
     setDoor(doors[0], pl); setDoor(doors[1], pr);
-    doors[0].el.style.setProperty('--seam', Math.max(0, 1 - pr * 6).toFixed(3));
+    // Die rechte Kante wirft ihren Schatten auf die linke Tuer: je hoeher sie steht, desto breiter
+    // und weicher; schwingt sie weit auf, verschwindet er
+    var zr = stage.clientWidth / 2 * Math.sin(DOOR.deg * pr * Math.PI / 180);
+    doors[0].el.style.setProperty('--seamW', (6 + zr * .9).toFixed(1) + 'px');
+    doors[0].el.style.setProperty('--seam', ((.75 + Math.min(.5, zr * .03)) * Math.max(0, 1 - Math.max(0, pr - .12) * 5)).toFixed(3));
     // Schatten der Tuerkanten auf dem Papier: wo die Kante im Bild steht (mit Perspektive),
     // dunkel direkt daneben, weicher und heller, je hoeher die Tuer steht
     var w = stage.clientWidth, P = w * 1.7, half = w / 2;
@@ -98,16 +104,17 @@
   function swingDoors(to, ms, lag, done) {
     cancelAnimationFrame(doorRaf);
     doorBusy = true;
-    var from = doorAt.slice(), opening = to > Math.max(from[0], from[1]), t0 = performance.now();
+    if (typeof to === 'number') to = [to, to];
+    var from = doorAt.slice(), opening = to[1] > from[1], t0 = performance.now();
     var lags = opening ? [lag, 0] : [0, lag];
     (function step(now) {
-      var k = function (i) { var t = Math.min(1, Math.max(0, (now - t0 - lags[i]) / ms)); return from[i] + (to - from[i]) * easeDoor(t); };
+      var k = function (i) { var t = Math.min(1, Math.max(0, (now - t0 - lags[i]) / ms)); return from[i] + (to[i] - from[i]) * easeDoor(t); };
       setDoors(k(0), k(1));
       if (now - t0 < ms + lag) doorRaf = requestAnimationFrame(step);
       else { doorBusy = false; if (done) done(); }
     })(t0);
   }
-  setDoors(0, 0);
+  setDoors(REST[0], REST[1]);
   function playIntro() {
     intro.style.visibility = '';
     stage.classList.add('is-opened');
@@ -120,18 +127,23 @@
   }
   function resetIntro() {
     intro.style.visibility = '';
-    swingDoors(0, DOOR.closeMs, DOOR.lag, function () { stage.classList.remove('is-opened'); });
+    swingDoors(REST, DOOR.closeMs, DOOR.lag, function () { stage.classList.remove('is-opened'); });
   }
-  // Im Ruhezustand heben sich die Tueren ab und zu kaum merklich: "ich gehe auf"
+  // Im Ruhezustand heben sich die Tueren ab und zu ein wenig: "ich gehe auf" - das erste Mal gleich nach dem Laden
   var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  setInterval(function () {
+  var teaseAt = 0;
+  function tease() {
     if (calm || !load.open || doorBusy || phase !== 'day' || taplayer.classList.contains('is-hidden') || stage.classList.contains('is-pressed')) return;
-    swingDoors(.014, 520, 90, function () { swingDoors(0, 700, 90); });
-  }, 5200);
-  // Druckgefuehl: das Siegel gibt nach, auf Android ein kurzer Impuls
+    teaseAt = performance.now();
+    swingDoors(TEASE, 620, 110, function () { setTimeout(function () { if (!doorBusy && !stage.classList.contains('is-opened') && !stage.classList.contains('is-pressed')) swingDoors(REST, 900, 110); }, 140); });
+  }
+  setInterval(function () { if (performance.now() - teaseAt > 4300) tease(); }, 300);
+  // Druckgefuehl: das Siegel gibt nach und drueckt beide Tueren flach, auf Android ein kurzer Impuls
   function press(on) {
+    if (!load.open || stage.classList.contains('is-opened') || on === stage.classList.contains('is-pressed')) return;
     stage.classList.toggle('is-pressed', on);
-    if (on && load.open && navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+    if (on) { teaseAt = performance.now(); swingDoors([0, 0], 110, 0); if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} } }
+    else swingDoors(REST, 260, 0);
   }
   taplayer.addEventListener('pointerdown', function () { press(true); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { taplayer.addEventListener(ev, function () { setTimeout(function () { press(false); }, 90); }); });
@@ -182,6 +194,7 @@
     if (load.ready && load.shown >= .995) {
       load.open = true;
       stage.classList.add('is-ready');   // Siegel erscheint
+      teaseAt = performance.now() - 3300;  // erstes Anheben kurz danach
       if (load.wantOpen) { open(); return; }
       startCues.classList.add('is-ready');
     }
@@ -444,8 +457,12 @@
     }
     sc.lineTo(px, py);
     sc.lineTo(pile.fr + 3, edgeY(pile.fr + 3));
-    sc.lineTo(pile.fr + 3, edgeY(pile.fr + 3) + 2.2);
-    sc.lineTo(pile.fl - 3, edgeY(pile.fl - 3) + 2.2);
+    // Unterkante: der Schnee haengt ueber die Kante des Players, aber nur so weit,
+    // wie dort schon Schnee liegt - sonst erscheint am Anfang ein Streifen auf einmal
+    var lip = function (k) { return Math.min(2.2, h[k] * 1.6); };
+    sc.lineTo(pile.fr + 3, edgeY(pile.fr + 3) + lip(n - 1));
+    for (i = n - 1; i >= 0; i--) { x = pile.fl + i * BIN; sc.lineTo(x, edgeY(x) + lip(i)); }
+    sc.lineTo(pile.fl - 3, edgeY(pile.fl - 3) + lip(0));
     sc.closePath();
     var g = sc.createLinearGradient(0, top, 0, edgeY(pile.fl) + 2);
     g.addColorStop(0, '#ffffff'); g.addColorStop(.55, '#f4f7fc'); g.addColorStop(1, '#d9e1ee');
@@ -731,6 +748,7 @@
       return;
     }
     taplayer.classList.add('is-hidden');
+    stage.classList.remove('is-pressed');
     unlockVoice();
     if (actx) { actx.resume(); startAmbience(); }
     soundBtn.hidden = false;

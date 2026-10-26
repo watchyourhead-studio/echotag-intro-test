@@ -244,7 +244,7 @@ body {
 .door-r .dim { background: linear-gradient(270deg, rgba(42, 24, 16, .9), rgba(42, 24, 16, .35)); }
 /* Naht: die rechte Tuer liegt oben, ihre Kante wirft einen feinen Schatten auf die linke */
 .front::before { content: ''; position: absolute; top: 0; bottom: 0; }
-.door-l .front::before { right: 0; width: 9px; background: linear-gradient(to left, rgba(92, 62, 40, .3), rgba(92, 62, 40, .1) 35%, rgba(92, 62, 40, 0)); opacity: var(--seam, 1); }
+.door-l .front::before { right: 0; width: var(--seamW, 9px); background: linear-gradient(to left, rgba(92, 62, 40, .32), rgba(92, 62, 40, .12) 35%, rgba(92, 62, 40, 0)); opacity: var(--seam, 1); }
 .door-r .front::before { left: 0; width: 1px; background: rgba(120, 88, 62, .45); }
 /* Siegel: klebt an der rechten Tuer und ragt ueber die Naht; erscheint, wenn alles geladen ist */
 .seal {
