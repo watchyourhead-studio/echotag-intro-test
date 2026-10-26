@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0E1A3D">
+<title>Eine Weihnachtsnachricht für dich</title>
+<meta name="description" content="Ton an, einmal tippen – und Paris geht für dich in den Abend.">
+<!-- Link-Vorschau (WhatsApp, iMessage, Telegram): Crawler fuehren kein JS aus, daher statisch -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Eine Weihnachtsnachricht für dich">
+<meta property="og:description" content="Ton an, einmal tippen – und Paris geht für dich in den Abend.">
+<meta property="og:image" content="https://watchyourhead-studio.github.io/echotag-intro-test/v7c/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="papier.jpg" as="image">
+<link rel="preload" href="tuer.jpg" as="image">
+<link rel="preload" href="siegel.png" as="image">
+<link rel="stylesheet" href="style.css?v=v7c1">
+</head>
+<body>
+<!-- Zeichen-Filter: Tuschelinien zittern leicht, Aquarell franst aus -->
+<svg class="defs" aria-hidden="true" width="0" height="0">
+  <filter id="ink" x="-5%" y="-20%" width="110%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="2" seed="3" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="2.6" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="wash" x="-20%" y="-20%" width="140%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency=".09" numOctaves="3" seed="8" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feGaussianBlur in="d" stdDeviation=".5"/>
+  </filter>
+</svg>
+
+<div class="stage" id="stage">
+  <!-- Leeres Kartenpapier sofort sichtbar (auch ohne WebGL); das Canvas legt sich darueber -->
+  <img class="still" id="still" src="papier.jpg" alt="">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <canvas id="fx" aria-hidden="true"></canvas>
+
+  <!-- Umschlag: zwei Tueren aus Papier, die in 3D aufschwingen; das Siegel klebt an der rechten.
+       v7c: Papier und Siegel haben echte Dicke (Kantenflaeche, Wachs aus gestapelten Schichten).
+       Dahinter liegt schon die Buehne mit dem Namen, die Feder zeichnet, waehrend die Tueren noch aufgehen. -->
+  <div class="intro" id="intro" aria-hidden="true">
+    <div class="intro-shade" id="introShade"></div>
+    <div class="door door-l" id="doorL"><div class="face front"><i class="dim"></i></div><i class="edge"></i></div>
+    <div class="door door-r" id="doorR"><div class="face front"><i class="dim"></i></div><i class="edge"></i><div class="seal" id="seal"><img src="siegel.png" alt="" style="--z:0"><img src="siegel.png" alt="" style="--z:1"><img src="siegel.png" alt="" style="--z:2"><img src="siegel.png" alt="" style="--z:3"><img src="siegel.png" alt="" style="--z:4"><img src="siegel.png" alt="" style="--z:5"><img src="siegel.png" alt="" style="--z:6"><img src="siegel.png" alt="" style="--z:7"><img src="siegel.png" alt="" style="--z:8"><img src="siegel.png" alt="" style="--z:9"><img src="siegel.png" alt="" style="--z:10"><img src="siegel.png" alt="" style="--z:11"><img src="siegel.png" alt="" style="--z:12"><img src="siegel.png" alt="" style="--z:13"><img src="siegel.png" alt="" style="--z:14"><img src="siegel.png" alt="" style="--z:15"><img src="siegel.png" alt="" style="--z:16"></div></div>
+  </div>
+
+  <div class="greeting" id="greeting" aria-live="polite">
+    <span class="g-fuer">Für</span>
+    <span class="g-name" id="gName"></span>
+  </div>
+
+  <div class="topbar">
+    <button type="button" class="sound" id="soundBtn" aria-label="Musik aus" hidden>
+      <svg class="s-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5H4Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg class="s-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5H4Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <button type="button" class="daynight" id="dayNight" aria-label="Tag oder Nacht" hidden>
+      <span class="dn-knob" aria-hidden="true"></span>
+      <svg class="dn-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg class="dn-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.6A7.6 7.6 0 0 1 9.4 4.5a7.6 7.6 0 1 0 10.1 10.1Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
+  <div class="taplayer" id="taplayer" role="button" tabindex="0" aria-label="Umschlag öffnen">
+    <div class="start-cues">
+      <div class="cta">
+        <div class="loading" id="loading" aria-live="polite">
+          <span class="loading-text">Karte wird vorbereitet</span>
+          <svg viewBox="0 0 160 8" aria-hidden="true">
+            <clipPath id="loadClip"><rect id="loadRect" x="0" y="-6" width="0" height="20"/></clipPath>
+            <path d="M2 4 C 40 3, 80 5.2, 120 3.8 S 150 4.4, 158 4" class="ll-base"/>
+            <g clip-path="url(#loadClip)"><path d="M2 4 C 40 3, 80 5.2, 120 3.8 S 150 4.4, 158 4" class="ll-ink"/></g>
+          </svg>
+        </div>
+        <div class="open-hint" id="hint">Zum Öffnen tippen</div>
+      </div>
+      <div class="sound-hint"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6v4h3l4 3V3L5 6H2Z"/><path d="M11 5.5a4 4 0 0 1 0 5M13 3.5a7 7 0 0 1 0 9"/></svg><span>Ton an für das beste Erlebnis</span></div>
+    </div>
+  </div>
+
+  <div class="card-wrap" id="cardWrap" aria-hidden="true">
+    <!-- Player wie mit Feder und Aquarell auf das Kartenpapier gezeichnet -->
+    <div class="card" id="card">
+      <svg class="card-edge" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true">
+        <rect x="2" y="2" width="296" height="76" rx="16" class="edge-a"/>
+        <rect x="3.2" y="2.8" width="294" height="74.6" rx="15" class="edge-b"/>
+      </svg>
+      <button type="button" class="play" id="playBtn" aria-label="Abspielen">
+        <svg viewBox="0 0 56 56" aria-hidden="true">
+          <circle cx="28" cy="28" r="21" class="play-wash"/>
+          <circle cx="28" cy="28" r="23.5" class="play-ring"/>
+          <path id="iconPlay" d="M23 19.5 L37.5 28 L23 36.5 Z" class="play-icon"/>
+          <g id="iconPause" class="play-icon" style="display:none"><path d="M22.5 19.5v17M33.5 19.5v17"/></g>
+        </svg>
+      </button>
+      <div class="card-body">
+        <p class="card-eyebrow">EchoTag</p>
+        <h1 class="card-title">Deine Sprachnachricht</h1>
+        <div class="track-row">
+          <div class="track" id="track" role="slider" aria-label="Fortschritt" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+            <svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M3 8 C 40 6.2, 75 9.4, 110 7.4 S 170 6.6, 197 7.8" pathLength="100" class="track-line"/>
+              <clipPath id="fillClip"><rect id="fillRect" x="0" y="-10" width="0" height="34"/></clipPath>
+              <g clip-path="url(#fillClip)"><path id="fill" d="M3 8 C 40 6.2, 75 9.4, 110 7.4 S 170 6.6, 197 7.8" class="track-fill"/></g>
+            </svg>
+          </div>
+          <span class="time" id="tCur">0:00</span>
+        </div>
+      </div>
+    </div>
+    <div class="after">
+      <a class="gift" id="giftLink" href="#" target="_blank" rel="noopener">Selbst eine EchoTag-Karte verschenken</a>
+      <button type="button" class="replay" id="replayBtn">Nochmal erleben</button>
+    </div>
+  </div>
+
+  <!-- Schnee vor allem, auch vor dem Player, damit er sich darauf sammeln kann -->
+  <canvas id="snow" aria-hidden="true"></canvas>
+
+  <audio id="voice" src="nachricht.mp3" preload="auto"></audio>
+</div>
+<script src="app.js?v=v7c1"></script>
+</body>
+</html>
