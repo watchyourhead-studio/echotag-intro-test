@@ -28,11 +28,12 @@
     voiceAt: 13250
   };
 
-  var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .45, turm: .4, papier: .8 };
+  var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .24, turm: .4, papier: .8, zeichnen: .32 };
 
   var qs = new URLSearchParams(location.search);
   var recipient = (qs.get('name') || '').replace(/\s+/g, ' ').trim().slice(0, 24);
   document.getElementById('gName').textContent = recipient || 'Dich';
+  if (recipient) document.title = 'Eine Weihnachtsnachricht für ' + recipient;
 
   var stage = document.getElementById('stage');
   var still = document.getElementById('still');
@@ -594,7 +595,7 @@
     bus.master = actx.createGain(); bus.master.connect(actx.destination);
     ['music', 'atmo', 'sfx'].forEach(function (k) { bus[k] = actx.createGain(); bus[k].gain.value = 0; bus[k].connect(bus.master); });
     bus.sfx.gain.value = 1;
-    ['musik', 'atmo', 'klick', 'kette', 'turm', 'papier'].forEach(function (n) {
+    ['musik', 'atmo', 'klick', 'kette', 'turm', 'papier', 'zeichnen'].forEach(function (n) {
       var tick = trackLoad(n === 'musik' ? 4 : n === 'atmo' ? .6 : .2);
       fetch('audio/' + n + '.mp3').then(function (r) { return r.arrayBuffer(); }).then(function (data) {
         // Safari kennt nur die Callback-Form
@@ -763,6 +764,8 @@
     playIntro();
     // Erst zeichnet die Feder, dann laeuft das Aquarell ein, dann wird es Nacht
     tween('draw', 1, T.drawMs, T.drawAt);
+    // Feder auf Papier, solange gezeichnet wird (die Datei ist genau T.drawMs lang und blendet zum Schluss aus)
+    sfx('zeichnen', VOL.zeichnen, T.drawAt);
     tween('paint', 1, T.paintMs, T.paintAt);
     if (!hasGL) { still.style.transition = 'opacity 2s ease'; still.src = 'tag.jpg'; }
     toNight(false, T.nightAt);
@@ -837,9 +840,12 @@
   voice.addEventListener('ended', function () {
     voice.currentTime = 0;
     duck(false);
-    // Nach der Nachricht: dezent einladen, selbst eine Karte zu verschenken
-    giftLink.classList.add('is-shown');
-    requestAnimationFrame(function () { requestAnimationFrame(function () { giftLink.classList.add('is-in'); }); });
+    // Schlusspunkt, egal wie lang die Nachricht war: der Turm funkelt, dann erst die Einladung
+    sparkle(500); sparkleLoop();
+    later(function () {
+      giftLink.classList.add('is-shown');
+      requestAnimationFrame(function () { requestAnimationFrame(function () { giftLink.classList.add('is-in'); }); });
+    }, 3000);
   });
   voice.addEventListener('loadedmetadata', function () {
     track.setAttribute('aria-valuemax', String(Math.round(voice.duration)));
