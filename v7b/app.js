@@ -28,7 +28,7 @@
     voiceAt: 13250
   };
 
-  var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .24, turm: .4, papier: .8, zeichnen: .16 };
+  var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, tink: .03, turm: .4, papier: .8, zeichnen: .16 };
 
   var qs = new URLSearchParams(location.search);
   var recipient = (qs.get('name') || '').replace(/\s+/g, ' ').trim().slice(0, 24);
@@ -360,11 +360,14 @@
       gl.uniform2f(uni.uScale, view.sx, view.sy);
     }
     snowCanvas.width = canvas.width; snowCanvas.height = canvas.height;
+    // Bestehende Flocken mitnehmen (z. B. wenn Safari seine Leiste ausblendet), sonst springt der Schnee
+    var sx = w / css.w, sy = h / css.h;
     css = { w: w, h: h, dpr: dpr };
     pile.geomAt = 0;
-    flakes = [];
+    flakes.forEach(function (f) { f.x *= sx; f.y *= sy; });
     var n = Math.round(w * h / 4200);
-    for (var i = 0; i < n; i++) flakes.push(newFlake(true));
+    if (flakes.length > n) flakes.length = n;
+    while (flakes.length < n) flakes.push(newFlake(true));
   }
   // ---------- Schnee: faellt vor allem, sammelt sich auf dem Player ----------
   // Rechnet in CSS-Pixeln. Flocken, die die Oberkante des Players treffen, bleiben
@@ -580,6 +583,11 @@
     requestAnimationFrame(frame);
   }
   window.addEventListener('resize', resize);
+  // Die Buehne ist 100dvh hoch: blendet iOS seine Leiste aus, waechst sie, ohne dass immer ein
+  // resize-Ereignis kommt. Dann lag die Schneehaube nicht mehr auf dem Player.
+  if (window.ResizeObserver) new ResizeObserver(function () {
+    if (stage.clientWidth !== css.w || stage.clientHeight !== css.h) resize();
+  }).observe(stage);
   resize();
   requestAnimationFrame(frame);
 
@@ -595,7 +603,7 @@
     bus.master = actx.createGain(); bus.master.connect(actx.destination);
     ['music', 'atmo', 'sfx'].forEach(function (k) { bus[k] = actx.createGain(); bus[k].gain.value = 0; bus[k].connect(bus.master); });
     bus.sfx.gain.value = 1;
-    ['musik', 'atmo', 'klick', 'kette', 'turm', 'papier', 'zeichnen'].forEach(function (n) {
+    ['musik', 'atmo', 'klick', 'turm', 'papier', 'zeichnen'].forEach(function (n) {
       var tick = trackLoad(n === 'musik' ? 4 : n === 'atmo' ? .6 : .2);
       fetch('audio/' + n + '.mp3').then(function (r) { return r.arrayBuffer(); }).then(function (data) {
         // Safari kennt nur die Callback-Form
@@ -623,14 +631,45 @@
     node.gain.setValueAtTime(node.gain.value, t);
     node.gain.linearRampToValueAtTime(to, t + sec);
   }
-  function sfx(name, vol, delayMs, rate) {
+  function sfx(name, vol, delayMs, rate, pan) {
     if (!actx || !buffers[name]) return;
     var src = actx.createBufferSource(), g = actx.createGain();
     src.buffer = buffers[name];
     src.playbackRate.value = rate || 1;
     g.gain.value = vol;
-    src.connect(g); g.connect(bus.sfx);
+    src.connect(g); g.connect(panTo(pan));
     src.start(actx.currentTime + (delayMs || 0) / 1000);
+  }
+  // Leicht links/rechts, dort wo es im Bild passiert (pan -1..1); ohne StereoPanner einfach mittig
+  function panTo(pan) {
+    if (!pan || !actx.createStereoPanner) return bus.sfx;
+    var p = actx.createStereoPanner(); p.pan.value = pan; p.connect(bus.sfx);
+    return p;
+  }
+  // Bildposition (0..1 im 9:16-Motiv) -> Stereoposition; auf schmalen Handys ist das Motiv seitlich beschnitten
+  function panFor(x) { return Math.max(-.6, Math.min(.6, (x - .5) / view.sx * 1.1)); }
+  // Ein Laempchen geht an: der Gluehfaden knistert ganz kurz, das Glas klingt winzig nach
+  var noise = null;
+  function tink(pan, vol) {
+    if (!actx) return;
+    if (!noise) {
+      noise = actx.createBuffer(1, Math.round(actx.sampleRate * .1), actx.sampleRate);
+      var nd = noise.getChannelData(0);
+      for (var i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    }
+    var t = actx.currentTime + .01, f = 1800 + Math.random() * 1800;
+    var out = actx.createGain(); out.gain.value = vol; out.connect(panTo(pan));
+    var n = actx.createBufferSource(), hp = actx.createBiquadFilter(), ng = actx.createGain();
+    n.buffer = noise; hp.type = 'highpass'; hp.frequency.value = 3200;
+    ng.gain.setValueAtTime(.45, t); ng.gain.exponentialRampToValueAtTime(.001, t + .007);
+    n.connect(hp); hp.connect(ng); ng.connect(out); n.start(t, Math.random() * .08, .012);
+    [[1, .5, .08 + Math.random() * .08], [2.76, .16, .045]].forEach(function (h) {
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.frequency.value = f * h[0];
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(h[1], t + .003);
+      g.gain.exponentialRampToValueAtTime(.0001, t + h[2]);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + h[2] + .02);
+    });
   }
   function startLoop(name, busName) {
     if (!actx || !buffers[name]) return;
@@ -659,14 +698,28 @@
     ramp(bus.music, on ? VOL.musicDucked : VOL.music, on ? .8 : 2.5);
     ramp(bus.atmo, on ? VOL.atmoDucked : VOL.atmo, on ? .8 : 2.5);
   }
-  // Klicks und Glitzern passend zu den Lichtern im Shader
+  // Aus lichter.png, nacht.jpg und dunkel.jpg ausgelesen: x-Position (0..1 im Bild) und Einschaltschwelle (uLight)
+  // jedes Lichts, paarweise. BULBS: Lichterkette und Baumlichter, WINDOWS: Fenster und Cafe.
+  var BULBS = [.049,.522,.056,.522,.035,.525,.028,.525,.071,.537,.084,.541,.071,.541,.065,.549,.057,.549,.069,.549,.102,.553,.094,.553,.126,.561,.062,.561,.121,.561,.070,.561,.092,.565,.134,.565,.090,.565,.121,.576,.107,.580,.113,.580,.130,.580,.112,.580,.113,.580,.126,.580,.141,.584,.073,.584,.161,.584,.143,.584,.135,.584,.146,.584,.076,.584,.097,.586,.099,.588,.140,.588,.106,.592,.184,.592,.101,.596,.120,.596,.064,.596,.121,.596,.091,.600,.177,.600,.121,.604,.116,.604,.099,.608,.108,.608,.093,.608,.101,.608,.118,.612,.304,.612,.122,.612,.115,.612,.084,.616,.198,.616,.101,.620,.102,.620,.105,.620,.093,.620,.119,.624,.127,.627,.307,.627,.224,.631,.146,.631,.318,.635,.220,.635,.284,.639,.159,.639,.284,.639,.278,.639,.295,.639,.183,.643,.181,.643,.190,.643,.340,.663,.441,.667,.463,.671,.327,.671,.327,.675,.309,.678,.465,.690,.447,.690,.309,.690,.306,.690,.451,.694,.466,.698,.456,.710,.468,.714,.503,.725,.630,.725,.429,.729,.630,.729,.627,.729,.627,.729,.631,.729,.634,.733,.449,.737,.630,.741,.627,.741,.677,.741,.667,.745,.681,.749,.638,.749,.630,.749,.684,.753,.710,.753,.696,.757,.630,.757,.704,.757,.645,.761,.631,.765,.741,.776,.745,.776,.634,.780,.634,.788,.654,.788,.811,.792,.771,.792,.703,.792,.670,.796,.656,.796,.674,.796,.661,.796,.656,.804,.816,.804,.820,.804,.801,.808,.756,.816,.751,.816,.684,.820,.818,.820,.899,.824,.897,.824,.889,.824,.886,.824,.894,.824,.827,.827,.729,.831,.732,.831,.729,.835,.806,.835,.798,.839,.728,.839,.732,.839,.822,.843,.813,.843,.961,.847,.910,.847,.911,.847,.954,.851,.786,.855,.975,.855,.885,.859,.919,.859,.970,.859,.983,.859,.997,.859,.919,.859,.965,.859,.983,.859,.989,.859,.970,.859,.997,.859,.869,.863,.927,.863,.872,.863,.925,.867,.953,.867,.945,.867,.926,.867,.947,.867,.943,.867,.955,.875,.962,.875,.976,.875,.979,.878,.989,.880,.914,.882,.884,.882,.963,.882,.920,.882,.905,.882,.918,.882,.954,.882,.953,.882,.912,.886,.946,.886,.983,.886,.949,.886,.966,.890,.901,.890,.996,.890,.977,.898,.966,.902,.918,.902,.940,.906,.933,.906,.988,.910,.938,.914,.996,.922];
+  var WINDOWS = [.453,.090,.734,.098,.210,.118,.068,.118,.735,.149,.202,.200,.220,.204,.468,.275,.205,.275,.211,.298,.306,.302,.917,.318,.111,.325,.145,.337,.806,.353,.305,.420,.094,.424,.304,.435,.127,.451,.732,.451,.123,.463,.927,.486];
+  // Klicks und Laempchen passend zu den Lichtern im Shader, jeweils dort im Stereobild, wo sie angehen
   function lightSounds(delay, ms) {
     var at = function (level) { return delay + easeTime(level, ms, 1.08); };
-    sfx('klick', VOL.klick, at(.03), 1);
-    sfx('klick', VOL.klick * .6, at(.18), 1.08);
-    sfx('klick', VOL.klick * .5, at(.31), .94);
-    sfx('klick', VOL.klick * .45, at(.46), 1.04);
-    sfx('kette', VOL.kette, at(.56));
+    // Lichtschalter: zur Mitte der Fenster, die um diese Zeit angehen
+    var winPan = function (level) {
+      var sum = 0, n = 0;
+      for (var i = 0; i < WINDOWS.length; i += 2) if (Math.abs(WINDOWS[i + 1] - level) < .08) { sum += WINDOWS[i]; n++; }
+      return n ? panFor(sum / n) : 0;
+    };
+    sfx('klick', VOL.klick, at(.03), 1, winPan(.1));
+    sfx('klick', VOL.klick * .6, at(.18), 1.08, winPan(.18));
+    sfx('klick', VOL.klick * .5, at(.31), .94, winPan(.31));
+    sfx('klick', VOL.klick * .45, at(.46), 1.04, winPan(.46));
+    // Lichterkette und Baumlichter: jedes Laempchen einzeln, wenn es im Bild aufleuchtet
+    for (var i = 0; i < BULBS.length; i += 2) (function (x, level) {
+      later(function () { if (phase === 'night') tink(panFor(x), VOL.tink * (.6 + Math.random() * .8)); },
+        at(level + .01) + (Math.random() - .5) * 50);
+    })(BULBS[i], BULBS[i + 1]);
   }
 
   soundBtn.addEventListener('click', function () {
