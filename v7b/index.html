@@ -18,7 +18,7 @@
 <link rel="preload" href="papier.jpg" as="image">
 <link rel="preload" href="tuer.jpg" as="image">
 <link rel="preload" href="siegel.png" as="image">
-<link rel="stylesheet" href="style.css?v=v7b21">
+<link rel="stylesheet" href="style.css?v=v7b22">
 </head>
 <body>
 <!-- Zeichen-Filter: Tuschelinien zittern leicht, Aquarell franst aus -->
@@ -41,12 +41,16 @@
   <canvas id="fx" aria-hidden="true"></canvas>
 
   <!-- Umschlag: zwei Tueren aus Papier, die in 3D aufschwingen; das Siegel klebt an der rechten.
+       Beim Laden liegt er flach und zu, die Feder zieht die Naht zum Siegel hin nach; danach loest sich das Papier.
        Papier und Siegel haben echte Dicke (Kantenflaeche, Wachs aus gestapelten Schichten).
        Dahinter liegt schon die Buehne mit dem Namen, die Feder zeichnet, waehrend die Tueren noch aufgehen. -->
   <div class="intro" id="intro" aria-hidden="true">
     <div class="intro-shade" id="introShade"></div>
     <div class="door door-l" id="doorL"><div class="face front"><i class="dim"></i></div><i class="edge"></i></div>
-    <div class="door door-r" id="doorR"><div class="face front"><i class="dim"></i></div><i class="edge"></i><div class="seal" id="seal"><img src="siegel.png" alt="" style="--z:0"><img src="siegel.png" alt="" style="--z:1"><img src="siegel.png" alt="" style="--z:2"><img src="siegel.png" alt="" style="--z:3"><img src="siegel.png" alt="" style="--z:4"><img src="siegel.png" alt="" style="--z:5"><img src="siegel.png" alt="" style="--z:6"><img src="siegel.png" alt="" style="--z:7"><img src="siegel.png" alt="" style="--z:8"><img src="siegel.png" alt="" style="--z:9"><img src="siegel.png" alt="" style="--z:10"><img src="siegel.png" alt="" style="--z:11"><img src="siegel.png" alt="" style="--z:12"><img src="siegel.png" alt="" style="--z:13"><img src="siegel.png" alt="" style="--z:14"><img src="siegel.png" alt="" style="--z:15"><img src="siegel.png" alt="" style="--z:16"></div></div>
+    <div class="door door-r" id="doorR"><div class="face front"><i class="dim"></i></div>
+      <!-- Ladeanzeige: die Feder zieht die Naht von oben und unten zum Siegel hin nach, genau auf der Kante der rechten Tuer.
+           Schlichte Elemente statt SVG mit Filter: das zeigt Safari in der 3D-Ebene nicht an. -->
+      <i class="seam-ink seam-top" id="seamTop"></i><i class="seam-ink seam-bottom" id="seamBottom"></i><i class="edge"></i><div class="seal" id="seal"><img src="siegel.png" alt="" style="--z:0"><img src="siegel.png" alt="" style="--z:1"><img src="siegel.png" alt="" style="--z:2"><img src="siegel.png" alt="" style="--z:3"><img src="siegel.png" alt="" style="--z:4"><img src="siegel.png" alt="" style="--z:5"><img src="siegel.png" alt="" style="--z:6"><img src="siegel.png" alt="" style="--z:7"><img src="siegel.png" alt="" style="--z:8"><img src="siegel.png" alt="" style="--z:9"><img src="siegel.png" alt="" style="--z:10"><img src="siegel.png" alt="" style="--z:11"><img src="siegel.png" alt="" style="--z:12"><img src="siegel.png" alt="" style="--z:13"><img src="siegel.png" alt="" style="--z:14"><img src="siegel.png" alt="" style="--z:15"><img src="siegel.png" alt="" style="--z:16"></div></div>
   </div>
 
   <div class="greeting" id="greeting" aria-live="polite">
@@ -71,11 +75,6 @@
       <div class="cta">
         <div class="loading" id="loading" aria-live="polite">
           <span class="loading-text">Karte wird vorbereitet</span>
-          <svg viewBox="0 0 160 8" aria-hidden="true">
-            <clipPath id="loadClip"><rect id="loadRect" x="0" y="-6" width="0" height="20"/></clipPath>
-            <path d="M2 4 C 40 3, 80 5.2, 120 3.8 S 150 4.4, 158 4" class="ll-base"/>
-            <g clip-path="url(#loadClip)"><path d="M2 4 C 40 3, 80 5.2, 120 3.8 S 150 4.4, 158 4" class="ll-ink"/></g>
-          </svg>
         </div>
         <div class="open-hint" id="hint">Zum Öffnen tippen</div>
       </div>
@@ -124,6 +123,6 @@
 
   <audio id="voice" src="nachricht.mp3" preload="auto"></audio>
 </div>
-<script src="app.js?v=v7b21"></script>
+<script src="app.js?v=v7b22"></script>
 </body>
 </html>

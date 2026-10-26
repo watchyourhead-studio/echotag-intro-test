@@ -192,10 +192,8 @@
     // Die Feder zieht in gleichmaessigem Tempo (gut 1 s) und setzt ab, wo das Laden noch nicht ist;
     // die Naht waechst von oben und unten und trifft sich am Siegel in der Mitte
     load.shown = Math.min(1, Math.max(load.shown, Math.min(target, load.shown + dt / 1100)));
-    var half = load.shown * 512;
-    seamTop.setAttribute('height', String(half + 10));
-    seamBottom.setAttribute('y', String(1010 - half));
-    seamBottom.setAttribute('height', String(half + 10));
+    seamTop.style.setProperty('--k', load.shown.toFixed(4));
+    seamBottom.style.setProperty('--k', load.shown.toFixed(4));
     // Erst wenn die Feder unten an der Naht angekommen ist, loest sich das Papier
     if (load.ready && load.shown >= .995) {
       load.open = true;

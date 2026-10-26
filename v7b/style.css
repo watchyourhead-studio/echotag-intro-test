@@ -194,9 +194,16 @@ body {
 }
 @keyframes loadIn { to { opacity: 1; } }
 .loading-text { font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; color: rgba(124, 29, 37, .72); }
-.loading svg { width: 150px; height: 8px; overflow: visible; }
-.ll-base { fill: none; stroke: #2B2A33; stroke-width: 1; opacity: .16; vector-effect: non-scaling-stroke; filter: url(#ink); }
-.ll-ink { fill: none; stroke: #2B2A33; stroke-width: 1.5; opacity: .8; stroke-linecap: round; vector-effect: non-scaling-stroke; filter: url(#ink); }
+/* Tuschelinie auf der Naht: waechst mit dem Laden von oben und unten zum Siegel und bleibt danach als feine Kante.
+   Mitte genau auf der Kante, knapp ueber der Papierebene, unter dem Siegel. Die Tusche ist nicht ganz gleichmaessig. */
+.seam-ink {
+  position: absolute; left: -.65px; width: 1.3px; height: 50%; border-radius: 1px;
+  background: repeating-linear-gradient(to bottom, rgba(43, 42, 51, .78) 0 9px, rgba(43, 42, 51, .62) 9px 13px, rgba(43, 42, 51, .74) 13px 23px, rgba(43, 42, 51, .58) 23px 26px);
+  transform: translateZ(.2px) scaleY(var(--k, 0));
+  pointer-events: none;
+}
+.seam-top { top: 0; transform-origin: 50% 0; }
+.seam-bottom { bottom: 0; transform-origin: 50% 100%; }
 #hint { transition: opacity .7s ease; }
 .start-cues:not(.is-ready) #hint { opacity: 0; animation: none; pointer-events: none; }
 .start-cues.is-ready .loading { animation: none; opacity: 0; transition: opacity .4s ease; }
@@ -246,14 +253,14 @@ body {
 .front::before { content: ''; position: absolute; top: 0; bottom: 0; }
 .door-l .front::before { right: 0; width: var(--seamW, 9px); background: linear-gradient(to left, rgba(92, 62, 40, .32), rgba(92, 62, 40, .12) 35%, rgba(92, 62, 40, 0)); opacity: var(--seam, 1); }
 .door-r .front::before { left: 0; width: 1px; background: rgba(120, 88, 62, .45); }
-/* Siegel: klebt an der rechten Tuer und ragt ueber die Naht; erscheint, wenn alles geladen ist.
+/* Siegel: klebt an der rechten Tuer und ragt ueber die Naht; von Anfang an da.
    Das Wachs ist ein Stapel aus Schichten (je 0,5px, zusammen 8px), die unteren dunkler: so zeigt es seine Dicke,
    sobald die Tuer kippt. Filter nur auf den Schichten, am Stapel wuerde er die 3D-Ebene plaetten. */
 .seal {
   position: absolute; left: 0; top: 50%; width: calc(var(--sw) * .23); aspect-ratio: 1;
   transform: translate(-50%, -50%) scale(var(--press, 1));
   transform-style: preserve-3d;
-  opacity: 0; transition: opacity .8s ease, transform .16s ease;
+  transition: transform .16s ease;
   pointer-events: none;
 }
 .seal img {
@@ -264,7 +271,6 @@ body {
 }
 .seal img:last-child { filter: brightness(var(--lit, 1)); }
 .seal img:first-child { filter: brightness(calc(var(--lit, 1) * .45)) drop-shadow(0 calc(var(--sh, 1) * 5px) calc(var(--sh, 1) * 7px) rgba(70, 24, 18, .42)); }
-.stage.is-ready .seal { opacity: 1; }
 .stage.is-pressed .seal { --press: .955; --sh: .35; }
 /* Papierdicke: eine schmale Kantenflaeche an der Naht, die nach unten zur Karte zeigt */
 .door { transform-style: preserve-3d; }

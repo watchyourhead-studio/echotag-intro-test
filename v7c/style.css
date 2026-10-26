@@ -194,10 +194,16 @@ body {
 }
 @keyframes loadIn { to { opacity: 1; } }
 .loading-text { font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; color: rgba(124, 29, 37, .72); }
-/* Tuschelinie auf der Naht: waechst mit dem Laden von oben nach unten und bleibt danach als feine Kante */
-/* Mitte der Linie liegt genau auf der Kante; knapp ueber der Papierebene, unter dem Siegel */
-.seam-ink { position: absolute; left: -5px; top: 0; width: 10px; height: 100%; overflow: visible; pointer-events: none; transform: translateZ(.2px); }
-.seam-ink path { fill: none; stroke: #2B2A33; stroke-width: 1.3; opacity: .72; stroke-linecap: round; vector-effect: non-scaling-stroke; filter: url(#inkSeam); }
+/* Tuschelinie auf der Naht: waechst mit dem Laden von oben und unten zum Siegel und bleibt danach als feine Kante.
+   Mitte genau auf der Kante, knapp ueber der Papierebene, unter dem Siegel. Die Tusche ist nicht ganz gleichmaessig. */
+.seam-ink {
+  position: absolute; left: -.65px; width: 1.3px; height: 50%; border-radius: 1px;
+  background: repeating-linear-gradient(to bottom, rgba(43, 42, 51, .78) 0 9px, rgba(43, 42, 51, .62) 9px 13px, rgba(43, 42, 51, .74) 13px 23px, rgba(43, 42, 51, .58) 23px 26px);
+  transform: translateZ(.2px) scaleY(var(--k, 0));
+  pointer-events: none;
+}
+.seam-top { top: 0; transform-origin: 50% 0; }
+.seam-bottom { bottom: 0; transform-origin: 50% 100%; }
 #hint { transition: opacity .7s ease; }
 .start-cues:not(.is-ready) #hint { opacity: 0; animation: none; pointer-events: none; }
 .start-cues.is-ready .loading { animation: none; opacity: 0; transition: opacity .4s ease; }

@@ -54,7 +54,7 @@
   var replayBtn = document.getElementById('replayBtn');
   var giftLink = document.getElementById('giftLink');
   // ---------- Umschlag: zwei Papiertueren schwingen zur Kamera auf ----------
-  // Die Tueren haengen an den Bildraendern; ab etwa 90 Grad sind sie aus dem Bild.
+  // Die Tueren haengen an den Bildraendern; ab etwa 73 Grad sind sie aus dem Bild.
   var intro = document.getElementById('intro');
   var introShade = document.getElementById('introShade');
   var doors = ['doorL', 'doorR'].map(function (id, i) {
@@ -62,7 +62,9 @@
     return { el: el, dim: el.querySelector('.dim'), dir: i ? 1 : -1 };
   });
   var seal = document.getElementById('seal');
-  var DOOR = { deg: 100, crack: [.07, .1], crackMs: 240, openMs: 2300, closeMs: 1700, lag: 160 };   // die rechte Tuer liegt oben und geht zuerst
+  // Ab etwa 73 Grad sind die Tueren aus dem Bild. Sie schwingen nur bis 80 Grad (open .8), damit sie
+  // sichtbar abbremsen, statt mit voller Fahrt hinauszuwischen.
+  var DOOR = { deg: 100, open: .8, crack: [.07, .1], crackMs: 240, openMs: 2100, closeMs: 1700, lag: 160 };   // die rechte Tuer liegt oben und geht zuerst
   // Dickes Papier liegt nie ganz flach: in Ruhe stehen die Tueren an der Naht etwas hoch
   var REST = [.03, .05], TEASE = [.09, .13];
   var doorRaf = 0, doorBusy = false, doorAt = [0, 0];
@@ -114,13 +116,13 @@
       else { doorBusy = false; if (done) done(); }
     })(t0);
   }
-  setDoors(REST[0], REST[1]);
+  setDoors(0, 0);   // beim Laden liegt der Umschlag flach und fest zu
   function playIntro() {
     intro.style.visibility = '';
     stage.classList.add('is-opened');
-    var hide = function () { cancelAnimationFrame(doorRaf); doorBusy = false; setDoors(1, 1); intro.style.visibility = 'hidden'; };
+    var hide = function () { cancelAnimationFrame(doorRaf); doorBusy = false; setDoors(DOOR.open, DOOR.open); intro.style.visibility = 'hidden'; };
     // Erst loest sich das Papier einen Spalt, dann schwingen die Tueren auf
-    swingDoors(DOOR.crack, DOOR.crackMs, 40, function () { swingDoors(1, DOOR.openMs, DOOR.lag, hide); });
+    swingDoors(DOOR.crack, DOOR.crackMs, 40, function () { swingDoors(DOOR.open, DOOR.openMs, DOOR.lag, hide); });
     sfx('papier', VOL.papier, DOOR.crackMs);
     // Notbremse, falls der Browser keine Animationsbilder liefert
     later(hide, DOOR.crackMs + DOOR.openMs + DOOR.lag + 500);
@@ -140,8 +142,10 @@
   setInterval(function () { if (performance.now() - teaseAt > 4300) tease(); }, 300);
   // Druckgefuehl: das Siegel gibt nach und drueckt beide Tueren flach, auf Android ein kurzer Impuls
   function press(on) {
-    if (!load.open || stage.classList.contains('is-opened') || on === stage.classList.contains('is-pressed')) return;
+    if (stage.classList.contains('is-opened') || on === stage.classList.contains('is-pressed')) return;
     stage.classList.toggle('is-pressed', on);
+    // Waehrend des Ladens gibt nur das Siegel nach, das Papier liegt noch fest
+    if (!load.open) return;
     if (on) { teaseAt = performance.now(); swingDoors([0, 0], 110, 0); if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} } }
     else swingDoors(REST, 260, 0);
   }
@@ -168,7 +172,7 @@
   // ---------- Laden: Knopf erst, wenn Bilder und Musik bereit sind ----------
   var load = { total: 0, done: 0, shown: 0, armed: false, ready: false, open: false };
   var startCues = document.querySelector('.start-cues');
-  var loadRect = document.getElementById('loadRect');
+  var seamTop = document.getElementById('seamTop'), seamBottom = document.getElementById('seamBottom');
   function trackLoad(weight) {
     var once = false;
     load.total += weight;
@@ -179,23 +183,25 @@
   }
   function setReady() {
     load.ready = true;
-    // War alles sofort da, wurde die Linie nie gezeigt: Knopf gleich freigeben
-    if (performance.now() < 350) load.shown = 1;
     // Falls die Animation gedrosselt laeuft (Energiesparmodus), trotzdem freigeben
-    setTimeout(function () { if (!load.open) { load.shown = 1; drawLoad(16); } }, 900);
+    setTimeout(function () { if (!load.open) { load.shown = 1; drawLoad(16); } }, 2000);
   }
   function drawLoad(dt) {
     if (load.open) return;
     var target = load.ready ? 1 : (load.total ? load.done / load.total : 0);
-    load.shown += (target - load.shown) * Math.min(1, dt * (load.ready ? .012 : .006)) + (load.ready ? dt * .0004 : 0);
-    load.shown = Math.min(1, load.shown);
-    loadRect.setAttribute('width', String(load.shown * 165));
-    // Knopf erst, wenn die Linie sichtbar am Ende angekommen ist
+    // Die Feder zieht in gleichmaessigem Tempo (gut 1 s) und setzt ab, wo das Laden noch nicht ist;
+    // die Naht waechst von oben und unten und trifft sich am Siegel in der Mitte
+    load.shown = Math.min(1, Math.max(load.shown, Math.min(target, load.shown + dt / 1100)));
+    seamTop.style.setProperty('--k', load.shown.toFixed(4));
+    seamBottom.style.setProperty('--k', load.shown.toFixed(4));
+    // Erst wenn die Feder unten an der Naht angekommen ist, loest sich das Papier
     if (load.ready && load.shown >= .995) {
       load.open = true;
-      stage.classList.add('is-ready');   // Siegel erscheint
-      teaseAt = performance.now() - 3300;  // erstes Anheben kurz danach
+      stage.classList.add('is-ready');
       if (load.wantOpen) { open(); return; }
+      // Das Papier loest sich: die Tueren heben sich in ihre Ruhelage, kurz danach das erste Anheben
+      swingDoors(REST, 700, 120);
+      teaseAt = performance.now() - 3000;
       startCues.classList.add('is-ready');
     }
   }

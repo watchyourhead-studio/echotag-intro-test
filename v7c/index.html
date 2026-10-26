@@ -18,7 +18,7 @@
 <link rel="preload" href="papier.jpg" as="image">
 <link rel="preload" href="tuer.jpg" as="image">
 <link rel="preload" href="siegel.png" as="image">
-<link rel="stylesheet" href="style.css?v=v7c4">
+<link rel="stylesheet" href="style.css?v=v7c5">
 </head>
 <body>
 <!-- Zeichen-Filter: Tuschelinien zittern leicht, Aquarell franst aus -->
@@ -26,10 +26,6 @@
   <filter id="ink" x="-5%" y="-20%" width="110%" height="140%">
     <feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="2" seed="3" result="n"/>
     <feDisplacementMap in="SourceGraphic" in2="n" scale="2.6" xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-  <filter id="inkSeam" filterUnits="userSpaceOnUse" x="0" y="-20" width="10" height="1040">
-    <feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="2" seed="5" result="n"/>
-    <feDisplacementMap in="SourceGraphic" in2="n" scale=".9" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
   <filter id="wash" x="-20%" y="-20%" width="140%" height="140%">
     <feTurbulence type="fractalNoise" baseFrequency=".09" numOctaves="3" seed="8" result="n"/>
@@ -52,11 +48,9 @@
     <div class="intro-shade" id="introShade"></div>
     <div class="door door-l" id="doorL"><div class="face front"><i class="dim"></i></div><i class="edge"></i></div>
     <div class="door door-r" id="doorR"><div class="face front"><i class="dim"></i></div>
-      <!-- Ladeanzeige: die Feder zieht die Naht von oben und unten zum Siegel hin nach, genau auf der Kante der rechten Tuer -->
-      <svg class="seam-ink" viewBox="0 0 10 1000" preserveAspectRatio="none" aria-hidden="true">
-        <clipPath id="seamClip"><rect id="seamTop" x="-10" y="-10" width="30" height="0"/><rect id="seamBottom" x="-10" y="1010" width="30" height="0"/></clipPath>
-        <g clip-path="url(#seamClip)"><path d="M5 0 V 1000"/></g>
-      </svg><i class="edge"></i><div class="seal" id="seal"><img src="siegel.png" alt="" style="--z:0"><img src="siegel.png" alt="" style="--z:1"><img src="siegel.png" alt="" style="--z:2"><img src="siegel.png" alt="" style="--z:3"><img src="siegel.png" alt="" style="--z:4"><img src="siegel.png" alt="" style="--z:5"><img src="siegel.png" alt="" style="--z:6"><img src="siegel.png" alt="" style="--z:7"><img src="siegel.png" alt="" style="--z:8"><img src="siegel.png" alt="" style="--z:9"><img src="siegel.png" alt="" style="--z:10"><img src="siegel.png" alt="" style="--z:11"><img src="siegel.png" alt="" style="--z:12"><img src="siegel.png" alt="" style="--z:13"><img src="siegel.png" alt="" style="--z:14"><img src="siegel.png" alt="" style="--z:15"><img src="siegel.png" alt="" style="--z:16"></div></div>
+      <!-- Ladeanzeige: die Feder zieht die Naht von oben und unten zum Siegel hin nach, genau auf der Kante der rechten Tuer.
+           Schlichte Elemente statt SVG mit Filter: das zeigt Safari in der 3D-Ebene nicht an. -->
+      <i class="seam-ink seam-top" id="seamTop"></i><i class="seam-ink seam-bottom" id="seamBottom"></i><i class="edge"></i><div class="seal" id="seal"><img src="siegel.png" alt="" style="--z:0"><img src="siegel.png" alt="" style="--z:1"><img src="siegel.png" alt="" style="--z:2"><img src="siegel.png" alt="" style="--z:3"><img src="siegel.png" alt="" style="--z:4"><img src="siegel.png" alt="" style="--z:5"><img src="siegel.png" alt="" style="--z:6"><img src="siegel.png" alt="" style="--z:7"><img src="siegel.png" alt="" style="--z:8"><img src="siegel.png" alt="" style="--z:9"><img src="siegel.png" alt="" style="--z:10"><img src="siegel.png" alt="" style="--z:11"><img src="siegel.png" alt="" style="--z:12"><img src="siegel.png" alt="" style="--z:13"><img src="siegel.png" alt="" style="--z:14"><img src="siegel.png" alt="" style="--z:15"><img src="siegel.png" alt="" style="--z:16"></div></div>
   </div>
 
   <div class="greeting" id="greeting" aria-live="polite">
@@ -129,6 +123,6 @@
 
   <audio id="voice" src="nachricht.mp3" preload="auto"></audio>
 </div>
-<script src="app.js?v=v7c4"></script>
+<script src="app.js?v=v7c5"></script>
 </body>
 </html>
