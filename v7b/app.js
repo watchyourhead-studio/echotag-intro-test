@@ -28,7 +28,7 @@
     voiceAt: 13250
   };
 
-  var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .24, turm: .4, papier: .8, zeichnen: .32 };
+  var VOL = { music: .45, musicDucked: .16, atmo: .45, atmoDucked: .22, klick: .5, kette: .24, turm: .4, papier: .8, zeichnen: .16 };
 
   var qs = new URLSearchParams(location.search);
   var recipient = (qs.get('name') || '').replace(/\s+/g, ' ').trim().slice(0, 24);
