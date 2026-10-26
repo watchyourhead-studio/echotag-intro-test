@@ -1,4 +1,4 @@
-/* EchoTag Day & Night (v7c = v7b mit dickem Papier und Siegel in 3D)
+/* EchoTag Day & Night (v7c = v7b, beim Laden zieht die Feder die Naht nach)
  * Umschlag (zwei Papiertueren mit Siegel) -> Tippen -> die Tueren schwingen auf, dahinter steht der Name, die Feder zieht schon jede Tuschelinie entlang
  * ihres Strichs -> Aquarell blueht ein -> Himmel dunkelt von oben ab -> Lichter gehen einzeln an
  * (Cafe, Fenster, dann Lichterkette und Baumlichter, die danach funkeln) ->
@@ -114,7 +114,7 @@
       else { doorBusy = false; if (done) done(); }
     })(t0);
   }
-  setDoors(REST[0], REST[1]);
+  setDoors(0, 0);   // beim Laden liegt der Umschlag flach und fest zu
   function playIntro() {
     intro.style.visibility = '';
     stage.classList.add('is-opened');
@@ -140,8 +140,10 @@
   setInterval(function () { if (performance.now() - teaseAt > 4300) tease(); }, 300);
   // Druckgefuehl: das Siegel gibt nach und drueckt beide Tueren flach, auf Android ein kurzer Impuls
   function press(on) {
-    if (!load.open || stage.classList.contains('is-opened') || on === stage.classList.contains('is-pressed')) return;
+    if (stage.classList.contains('is-opened') || on === stage.classList.contains('is-pressed')) return;
     stage.classList.toggle('is-pressed', on);
+    // Waehrend des Ladens gibt nur das Siegel nach, das Papier liegt noch fest
+    if (!load.open) return;
     if (on) { teaseAt = performance.now(); swingDoors([0, 0], 110, 0); if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} } }
     else swingDoors(REST, 260, 0);
   }
@@ -168,7 +170,7 @@
   // ---------- Laden: Knopf erst, wenn Bilder und Musik bereit sind ----------
   var load = { total: 0, done: 0, shown: 0, armed: false, ready: false, open: false };
   var startCues = document.querySelector('.start-cues');
-  var loadRect = document.getElementById('loadRect');
+  var seamRect = document.getElementById('seamRect');
   function trackLoad(weight) {
     var once = false;
     load.total += weight;
@@ -179,23 +181,23 @@
   }
   function setReady() {
     load.ready = true;
-    // War alles sofort da, wurde die Linie nie gezeigt: Knopf gleich freigeben
-    if (performance.now() < 350) load.shown = 1;
     // Falls die Animation gedrosselt laeuft (Energiesparmodus), trotzdem freigeben
-    setTimeout(function () { if (!load.open) { load.shown = 1; drawLoad(16); } }, 900);
+    setTimeout(function () { if (!load.open) { load.shown = 1; drawLoad(16); } }, 2000);
   }
   function drawLoad(dt) {
     if (load.open) return;
     var target = load.ready ? 1 : (load.total ? load.done / load.total : 0);
-    load.shown += (target - load.shown) * Math.min(1, dt * (load.ready ? .012 : .006)) + (load.ready ? dt * .0004 : 0);
-    load.shown = Math.min(1, load.shown);
-    loadRect.setAttribute('width', String(load.shown * 165));
-    // Knopf erst, wenn die Linie sichtbar am Ende angekommen ist
+    // Die Feder zieht in gleichmaessigem Tempo (ganze Naht in gut 1 s) und setzt ab, wo das Laden noch nicht ist
+    load.shown = Math.min(1, Math.max(load.shown, Math.min(target, load.shown + dt / 1100)));
+    seamRect.setAttribute('height', String(load.shown * 1020));
+    // Erst wenn die Feder unten an der Naht angekommen ist, loest sich das Papier
     if (load.ready && load.shown >= .995) {
       load.open = true;
-      stage.classList.add('is-ready');   // Siegel erscheint
-      teaseAt = performance.now() - 3300;  // erstes Anheben kurz danach
+      stage.classList.add('is-ready');
       if (load.wantOpen) { open(); return; }
+      // Das Papier loest sich: die Tueren heben sich in ihre Ruhelage, kurz danach das erste Anheben
+      swingDoors(REST, 700, 120);
+      teaseAt = performance.now() - 3000;
       startCues.classList.add('is-ready');
     }
   }
