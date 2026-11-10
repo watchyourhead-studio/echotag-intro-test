@@ -208,16 +208,6 @@
     audio.addEventListener('ended', function () { if (phase !== 'playing') return; phase = 'ended'; aStamp = performance.now(); });
     audio.addEventListener('loadedmetadata', function () { if (isFinite(audio.duration)) dur = audio.duration; });
     document.addEventListener('visibilitychange', function () { if (document.hidden && phase === 'playing' && !audio.paused) toggle(); });
-    /* Absender: Visitenkarte zum Speichern, wenn Kontaktdaten hinterlegt sind (marke/kontakt.js) */
-    var K = window.WYH, kBtn = $('.wyh-k');
-    if (kBtn && K && K.name) {
-      var v = ['BEGIN:VCARD', 'VERSION:3.0', 'N:' + K.name.split(' ').reverse().join(';'), 'FN:' + K.name];
-      if (K.firma) v.push('ORG:' + K.firma); if (K.rolle) v.push('TITLE:' + K.rolle);
-      if (K.telefon) v.push('TEL;TYPE=CELL:' + K.telefon); if (K.email) v.push('EMAIL:' + K.email); if (K.web) v.push('URL:' + K.web);
-      v.push('END:VCARD');
-      kBtn.href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(v.join('\r\n'));
-      kBtn.setAttribute('download', 'watchyourhead.vcf'); kBtn.hidden = false;
-    }
     var rep = $('.end .again');
     if (rep) rep.addEventListener('click', function () {
       audio.pause(); root.classList.remove('ended', 'paused'); phase = 'idle'; begin();
