@@ -27,8 +27,8 @@ jeweiligen `szene.js` (`ORT` und `tracks`) und müssen bei anderem Bildausschnit
 
 ## Ton
 
-Stimme und Klangebene sind je Werk zu einer Datei gemischt (`poersch/ton.mp3`, `kirsch/ton.mp3`).
-Quellen liegen in `src/ton/`, Zeiten und Lautstärken stehen in `tools/poersch_ton.sh` und `tools/kirsch_ton.sh`:
+Je Werk eine Datei (`poersch/ton.mp3`, `kirsch/ton.mp3`): die Stimme, hinten mit Stille verlängert, damit die
+Fahrt in den Raum Zeit hat. Optional leise Musik darunter, siehe Kopf von `tools/ton.sh`:
 
-    sh tools/poersch_ton.sh
-    sh tools/kirsch_ton.sh
+    sh tools/ton.sh poersch 82 72.5
+    sh tools/ton.sh kirsch 72 62
