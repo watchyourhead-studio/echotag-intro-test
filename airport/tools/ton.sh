@@ -9,9 +9,9 @@ K=$(echo "$W" | cut -c1)
 if [ -z "$M" ]; then
   ffmpeg -v error -y -i src/ton/$K-stimme.mp3 -af "aresample=44100,apad=whole_dur=$D" -ac 1 -b:a 96k $W/ton.mp3
 else
-  A=$(echo "$D - 5" | bc)
-  ffmpeg -v error -y -i src/ton/$K-stimme.mp3 -i "$M" -filter_complex "
-    [1:a]aresample=44100,atrim=0:28,asetpts=PTS-STARTPTS,asplit=4[m1][m2][m3][m4];
+  A=$((D - 5))
+  ffmpeg -v error -y -i src/ton/$K-stimme.mp3 -i "$M" -i "$M" -i "$M" -i "$M" -filter_complex "
+    [1:a]aresample=44100,atrim=0:28[m1];[2:a]aresample=44100,atrim=0:28[m2];[3:a]aresample=44100,atrim=0:28[m3];[4:a]aresample=44100,atrim=0:28[m4];
     [m1][m2]acrossfade=d=2:c1=tri:c2=tri[m12];[m12][m3]acrossfade=d=2:c1=tri:c2=tri[m123];[m123][m4]acrossfade=d=2:c1=tri:c2=tri[schleife];
     [0:a]aresample=44100,apad=whole_dur=$D[stimme];
     [schleife]atrim=0:$D,afade=t=in:d=3,volume='if(lt(t,$V),$P,min($S,$P+($S-$P)*(t-$V)/3))':eval=frame,afade=t=out:st=$A:d=5[musik];

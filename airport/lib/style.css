@@ -34,11 +34,15 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
 .subs span.said{opacity:1}
 .ended .subs{opacity:0}
 
-/* Fortschritt + Pause */
-.bar{position:absolute;left:22px;right:22px;bottom:max(20px,env(safe-area-inset-bottom));height:2px;background:color-mix(in srgb,currentColor 24%,transparent);
-  border-radius:2px;opacity:0;transition:opacity .5s;pointer-events:none}
-.bar i{display:block;height:100%;width:0;background:currentColor;border-radius:2px}
-.playing .bar{opacity:1}
+/* Zeitleiste: duenne Linie mit grosser Griff-Flaeche, ziehen springt an die Stelle */
+.bar{position:absolute;left:22px;right:22px;bottom:max(20px,env(safe-area-inset-bottom));height:3px;background:color-mix(in srgb,currentColor 24%,transparent);
+  border-radius:3px;opacity:0;transition:opacity .5s;pointer-events:none;touch-action:none;cursor:pointer}
+.bar::before{content:"";position:absolute;left:-12px;right:-12px;top:-22px;bottom:-18px}
+.bar i{position:relative;display:block;height:100%;width:0;background:currentColor;border-radius:3px}
+.bar i::after{content:"";position:absolute;right:-7px;top:50%;width:14px;height:14px;margin-top:-7px;border-radius:50%;background:currentColor;
+  transform:scale(.7);transition:transform .15s}
+.scrub .bar i::after{transform:scale(1.25)}
+.playing .bar{opacity:1;pointer-events:auto}
 .pausehint{position:absolute;left:50%;top:50%;width:76px;height:76px;margin:-38px;border-radius:50%;background:rgba(0,0,0,.42);
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:grid;place-items:center;opacity:0;transition:opacity .25s;pointer-events:none;color:#fff}
 .paused .pausehint{opacity:1}

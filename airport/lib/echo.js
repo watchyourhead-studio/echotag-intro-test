@@ -134,7 +134,23 @@
       if (audio.paused) { audio.play(); root.classList.remove('paused'); } else { audio.pause(); root.classList.add('paused'); }
     }
     startEl.addEventListener('click', begin);
-    stage.addEventListener('click', function (e) { if (e.target.closest('.start,.end')) return; toggle(); });
+    stage.addEventListener('click', function (e) { if (e.target.closest('.start,.end,.bar')) return; toggle(); });
+    /* Zeitleiste: ziehen oder tippen springt an die Stelle; Bild und Untertitel folgen der Stimme */
+    var bar = $('.bar'), dragging = false;
+    function seekTo(e) {
+      var r = bar.getBoundingClientRect(), k = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+      var ziel = k * (endAt || dur) * 0.999;
+      try { audio.currentTime = ziel; } catch (x) {}
+      aT = ziel; aStamp = performance.now(); barFill.style.width = (k * 100) + '%';
+    }
+    bar.addEventListener('pointerdown', function (e) {
+      if (phase === 'idle') return;
+      dragging = true; root.classList.add('scrub'); try { bar.setPointerCapture(e.pointerId); } catch (x) {}
+      seekTo(e); e.preventDefault();
+    });
+    bar.addEventListener('pointermove', function (e) { if (dragging) { seekTo(e); e.preventDefault(); } });
+    function endDrag() { dragging = false; root.classList.remove('scrub'); }
+    bar.addEventListener('pointerup', endDrag); bar.addEventListener('pointercancel', endDrag);
     audio.addEventListener('ended', function () { if (phase !== 'playing') return; phase = 'ended'; aStamp = performance.now(); });
     audio.addEventListener('loadedmetadata', function () { if (isFinite(audio.duration)) dur = audio.duration; });
     document.addEventListener('visibilitychange', function () { if (document.hidden && phase === 'playing' && !audio.paused) toggle(); });
