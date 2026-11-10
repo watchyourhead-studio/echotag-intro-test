@@ -7,7 +7,7 @@ ffmpeg -v error -y \
   -filter_complex "
    [0:a]aresample=44100,apad=whole_dur=82[stimme];
    [1:a]aresample=44100,atrim=0:82,asplit=2[b1][b2];
-   [b1]volume=0.10,afade=t=in:d=2.5,afade=t=out:st=78:d=4[bett];
+   [b1]volume=0.18,afade=t=in:d=2.5,afade=t=out:st=78:d=4[bett];
    [b2]volume=0.26,afade=t=in:st=70.5:d=4,afade=t=out:st=78:d=4[bettende];
    [2:a]aresample=44100,asplit=2[an1][an2];
    [an1]atrim=0:3.3,atempo=0.62,afade=t=out:st=4.9:d=0.4,volume=0.34,adelay=1500:all=1[schwell];

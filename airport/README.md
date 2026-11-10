@@ -6,7 +6,7 @@ Kamerafahrt durch das Werk, die der Sprachaufnahme des Künstlers folgt, mit Unt
 - `poersch/` – Thorsten Poersch, „Schönheit & Vergänglichkeit“: die Punkte schweben räumlich vor dem Putz und fügen sich nur von
   einem Standpunkt aus zum Gesicht. Die Kamera fliegt durch die Punktwolke dorthin; Neigen lässt es zerfallen. Punkte bröckeln, lösen sich auf und blühen neu auf, passend zum Text.
 - `kirsch/` – Susanne Kirsch, „Barfuß durch New York“: Start bei der Handschrift „Frankfurt → New York“,
-  Flug in die Collage, die Kamera besucht die Stellen, von denen sie spricht.
+  Flug in die Collage als Relief, die Kamera besucht die Stellen, von denen sie spricht. Schluss im hellen Loft.
 - `raum/` – Raumbild für den Schluss (mit Magnific erzeugt) samt Tiefenkarte. Das Werk wird als echtes Foto
   hineingesetzt; wo es hängt und wie groß, steht in `RAUM` oben in `poersch/szene.js`.
 - `lib/echo.js` – gemeinsamer Ablauf (Start-Tipp, Stimme, Untertitel, Zeitspuren, Neigung, Schlussbild).
@@ -24,3 +24,11 @@ jeweiligen `szene.js` (`ORT` und `tracks`) und müssen bei anderem Bildausschnit
 ## Ansehen ohne Ton
 
 `?t=36` an die Adresse hängen zeigt den Stand bei Sekunde 36 als Standbild.
+
+## Ton
+
+Stimme und Klangebene sind je Werk zu einer Datei gemischt (`poersch/ton.mp3`, `kirsch/ton.mp3`).
+Quellen liegen in `src/ton/`, Zeiten und Lautstärken stehen in `tools/poersch_ton.sh` und `tools/kirsch_ton.sh`:
+
+    sh tools/poersch_ton.sh
+    sh tools/kirsch_ton.sh
