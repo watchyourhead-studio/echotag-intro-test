@@ -13,8 +13,8 @@ bg = cv2.morphologyEx(lum, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_
 bg = cv2.GaussianBlur(bg, (0, 0), 6 * u)
 dark = np.clip(bg - lum, 0, 1)
 b, g, r = [im[..., i].astype(np.float32) for i in range(3)]
-cool = (b - r) > -6  # Punkte sind blaugrau bis schwarz, Putzschatten warm
-mask = ((dark > 0.17) & cool) | (lum < 0.24)
+cool = (b - r) > -9  # Punkte sind blaugrau bis schwarz, Putzschatten warm
+mask = ((dark > 0.17) | (lum < 0.24)) & cool
 mask = cv2.morphologyEx(mask.astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
 # Grund: Punkte herausrechnen. Luecken weich aus der Umgebung fuellen (gewichtetes Weichzeichnen
 # in mehreren Stufen), danach Putzkoernung aus einer freien Stelle des Bildes darueberlegen.
@@ -53,7 +53,7 @@ while y < H:
         x += sp
     y += sp * .866; row += 1
 json.dump({'w': W, 'h': H, 'n': len(pts) // 6, 'p': pts}, open(out + 'punkte.json', 'w'), separators=(',', ':'))
-s = 2
+s = 2 if W < 900 else 1  # kleine Fotos doppelt so gross ablegen
 cv2.imwrite(out + 'grund.jpg', cv2.resize(grund, (W * s, H * s), interpolation=cv2.INTER_CUBIC), [cv2.IMWRITE_JPEG_QUALITY, 84])
 cv2.imwrite(out + 'werk.jpg', cv2.resize(im, (W * s, H * s), interpolation=cv2.INTER_CUBIC), [cv2.IMWRITE_JPEG_QUALITY, 86])
 # Kontrollbild: Grund + Punkte neben dem Original

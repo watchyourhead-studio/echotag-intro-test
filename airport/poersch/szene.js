@@ -4,11 +4,11 @@
    genau dort, wo der Kuenstler davon spricht. Am Ende steht das unveraenderte Foto (werk.jpg). */
 (function () {
   var ORT = {
-    haar:  [.235, .330],
+    haar:  [.200, .270],
     ganz:  [.500, .540],
-    blick: [.560, .420],
-    auge:  [.650, .400],
-    riss:  [.630, .140],
+    blick: [.540, .430],
+    auge:  [.680, .375],
+    riss:  [.600, .800],
     putz:  [.600, .640],
     mitte: [.500, .480]
   };
