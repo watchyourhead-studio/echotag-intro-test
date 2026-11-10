@@ -112,7 +112,7 @@
 
     /* --- Zeit: laeuft an der Stimme entlang --- */
     var phase = 'idle', t0 = performance.now(), fixedT = Q.has('t') ? parseFloat(Q.get('t')) : null;
-    var aT = 0, aStamp = 0, dur = cfg.duration;
+    var aT = 0, aStamp = 0, dur = cfg.duration, endAt = cfg.endAt || 0; /* endAt: ab hier Schlussbild, der Ton darf laenger laufen */
     function voiceTime(now) {
       if (fixedT != null) return fixedT;
       if (phase === 'idle') return 0;
@@ -121,11 +121,11 @@
       if (ct !== aT) { aT = ct; aStamp = now; }
       return audio.paused ? ct : Math.min(dur, ct + (now - aStamp) / 1000);
     }
-    window.__seek = function (t) { fixedT = t; if (t > 0 && phase === 'idle') { phase = 'playing'; root.classList.add('playing'); } frame(performance.now()); };
+    window.__seek = function (t) { fixedT = t; frame(performance.now()); };
 
     function begin() {
       if (phase !== 'idle') return;
-      phase = 'playing'; root.classList.add('playing'); askMotion();
+      phase = 'playing'; askMotion();
       audio.currentTime = 0; aT = 0; aStamp = performance.now();
       var p = audio.play(); if (p && p.catch) p.catch(function () {});
     }
@@ -135,12 +135,12 @@
     }
     startEl.addEventListener('click', begin);
     stage.addEventListener('click', function (e) { if (e.target.closest('.start,.end')) return; toggle(); });
-    audio.addEventListener('ended', function () { phase = 'ended'; aStamp = performance.now(); root.classList.remove('playing'); root.classList.add('ended'); });
+    audio.addEventListener('ended', function () { if (phase !== 'playing') return; phase = 'ended'; aStamp = performance.now(); });
     audio.addEventListener('loadedmetadata', function () { if (isFinite(audio.duration)) dur = audio.duration; });
     document.addEventListener('visibilitychange', function () { if (document.hidden && phase === 'playing' && !audio.paused) toggle(); });
     var rep = $('.end .again');
     if (rep) rep.addEventListener('click', function () {
-      root.classList.remove('ended'); phase = 'idle'; begin();
+      audio.pause(); root.classList.remove('ended', 'paused'); phase = 'idle'; begin();
     });
 
     /* --- Bild --- */
@@ -159,8 +159,9 @@
       var s = {};
       for (var name in cfg.tracks) s[name] = sample(cfg.tracks[name], t);
       scene.draw({ t: t, clock: fixedT != null ? fixedT + 3 : (now - t0) / 1000, tilt: tilt, s: s, w: canvas.width, h: canvas.height, idle: phase === 'idle' && fixedT == null });
-      if (fixedT != null) { root.classList.toggle('ended', t >= dur + 0.2); root.classList.toggle('playing', t > 0 && t < dur + 0.2); }
-      if (phase !== 'idle') { updateSubs(Math.min(t, dur)); barFill.style.width = Math.min(100, t / dur * 100) + '%'; }
+      var fin = endAt || dur + 0.2, on = phase !== 'idle' || (fixedT != null && t > 0);
+      root.classList.toggle('ended', on && t >= fin); root.classList.toggle('playing', on && t < fin);
+      if (on) { updateSubs(Math.min(t, dur)); barFill.style.width = Math.min(100, t / fin * 100) + '%'; }
     }
     function loop(now) { frame(now); if (fixedT == null) requestAnimationFrame(loop); }
 

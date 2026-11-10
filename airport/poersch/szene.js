@@ -19,7 +19,7 @@
   function cam(t, ort, zoom) { return [t, [ORT[ort][0], ORT[ort][1], zoom]]; }
 
   Echo.start({
-    subs: 'untertitel.json', duration: 73.4,
+    subs: 'untertitel.json', duration: 82, endAt: 76.5,
     tracks: {
       /* Kamera: Zeit, Ort, Zoom (1 = der Standpunkt, von dem aus das Gesicht stimmt) */
       cam: [
