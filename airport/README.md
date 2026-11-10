@@ -27,8 +27,8 @@ jeweiligen `szene.js` (`ORT` und `tracks`) und müssen bei anderem Bildausschnit
 
 ## Ton
 
-Je Werk eine Datei (`poersch/ton.mp3`, `kirsch/ton.mp3`): die Stimme, hinten mit Stille verlängert, damit die
-Fahrt in den Raum Zeit hat. Optional leise Musik darunter, siehe Kopf von `tools/ton.sh`:
+Je Werk eine Datei (`poersch/ton.mp3`, `kirsch/ton.mp3`): die Stimme mit leiser Musik darunter, hinten verlängert,
+damit die Fahrt in den Raum Zeit hat. Stimme und Musik liegen in `src/ton/`. Pegel und Aufruf stehen im Kopf von `tools/ton.sh`:
 
-    sh tools/ton.sh poersch 82 72.5
-    sh tools/ton.sh kirsch 72 62
+    sh tools/ton.sh poersch 82 72.5 src/ton/p-musik.mp3 0.28 0.50
+    sh tools/ton.sh kirsch 72 62 src/ton/k-musik.mp3 0.28 0.50
