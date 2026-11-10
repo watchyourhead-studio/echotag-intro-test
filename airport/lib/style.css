@@ -1,0 +1,61 @@
+@font-face{font-family:Jost;src:url(../fonts/jost-var.woff2) format("woff2");font-weight:300 700;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg,#111);overflow:hidden;overscroll-behavior:none}
+body{font-family:Jost,system-ui,sans-serif;color:var(--ink,#fff);-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+.stage{position:fixed;inset:0;overflow:hidden;touch-action:manipulation}
+canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
+.scrim{position:absolute;left:0;right:0;pointer-events:none;transition:opacity .9s}
+.scrim.top{top:0;height:26%;background:linear-gradient(var(--scrim,rgba(0,0,0,.55)),transparent)}
+.scrim.bot{bottom:0;height:42%;background:linear-gradient(transparent,var(--scrim,rgba(0,0,0,.62)))}
+
+/* Start */
+.start{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;
+  padding:max(22px,env(safe-area-inset-top)) 24px max(34px,env(safe-area-inset-bottom));cursor:pointer;transition:opacity .7s}
+.start .eyebrow{font-size:11px;letter-spacing:.24em;text-transform:uppercase;opacity:.82;font-weight:500}
+.start .eyebrow b{display:block;font-weight:500;opacity:.7;margin-top:5px}
+.start .foot{display:flex;flex-direction:column;gap:6px}
+.start .artist{font-size:14px;letter-spacing:.16em;text-transform:uppercase;font-weight:500;opacity:.9}
+.start h1{font-size:clamp(30px,9vw,46px);line-height:1.04;font-weight:400;letter-spacing:-.01em;text-wrap:balance}
+.start .go{margin-top:22px;display:flex;align-items:center;gap:14px;font-size:15px;letter-spacing:.04em}
+.start .ring{position:relative;width:54px;height:54px;border-radius:50%;border:1.5px solid currentColor;display:grid;place-items:center;flex:none}
+.start .ring::after{content:"";position:absolute;inset:-1.5px;border-radius:50%;border:1.5px solid currentColor;animation:ping 2.2s cubic-bezier(.2,.6,.3,1) infinite}
+.start .ring svg{width:18px;height:18px;margin-left:3px}
+.start .go small{display:block;font-size:12px;opacity:.7;margin-top:2px;letter-spacing:.02em}
+.start.loading .go{opacity:.45}.start.loading .ring::after{animation:none;opacity:0}
+@keyframes ping{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.75);opacity:0}}
+.playing .start,.ended .start{opacity:0;pointer-events:none}
+
+/* Untertitel: eine Aussage, Wort fuer Wort */
+.subs{position:absolute;left:0;right:0;bottom:calc(max(26px,env(safe-area-inset-bottom)) + 26px);padding:0 22px;
+  text-align:center;font-size:clamp(19px,5.4vw,25px);line-height:1.28;font-weight:500;letter-spacing:.005em;
+  text-wrap:balance;pointer-events:none;opacity:0;transition:opacity .35s;text-shadow:0 1px 14px var(--subshadow,rgba(0,0,0,.6))}
+.subs.on{opacity:1}
+.subs span{opacity:.42;transition:opacity .16s linear}
+.subs span.said{opacity:1}
+.ended .subs{opacity:0}
+
+/* Fortschritt + Pause */
+.bar{position:absolute;left:22px;right:22px;bottom:max(20px,env(safe-area-inset-bottom));height:2px;background:color-mix(in srgb,currentColor 24%,transparent);
+  border-radius:2px;opacity:0;transition:opacity .5s;pointer-events:none}
+.bar i{display:block;height:100%;width:0;background:currentColor;border-radius:2px}
+.playing .bar{opacity:1}
+.pausehint{position:absolute;left:50%;top:50%;width:76px;height:76px;margin:-38px;border-radius:50%;background:rgba(0,0,0,.42);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:grid;place-items:center;opacity:0;transition:opacity .25s;pointer-events:none;color:#fff}
+.paused .pausehint{opacity:1}
+.pausehint svg{width:26px;height:26px;margin-left:4px}
+
+/* Schluss */
+.end{position:absolute;left:0;right:0;bottom:0;padding:0 24px max(30px,env(safe-area-inset-bottom));text-align:center;opacity:0;pointer-events:none;
+  transform:translateY(10px);transition:opacity 1.1s .5s,transform 1.1s .5s}
+.ended .end{opacity:1;pointer-events:auto;transform:none}
+.end .t{font-size:22px;font-weight:500;line-height:1.15}
+.end .m{font-size:13px;opacity:.75;margin-top:6px;letter-spacing:.03em}
+.end .row{display:flex;gap:10px;justify-content:center;margin-top:18px}
+.end a,.end button{font:inherit;font-size:14px;font-weight:500;letter-spacing:.03em;color:inherit;text-decoration:none;background:none;
+  border:1.5px solid currentColor;border-radius:999px;padding:11px 20px;cursor:pointer}
+.end a.fill{background:var(--ink,#fff);color:var(--bg,#111);border-color:var(--ink,#fff)}
+.ended .scrim.top{opacity:0}
+.render .start,.render .pausehint{display:none}
+@media (prefers-reduced-motion:reduce){.start .ring::after{animation:none}}
+.still{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none}
+.nogl .still{display:block}.nogl canvas#gl{display:none}

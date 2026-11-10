@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121315">
+<title>Schönheit &amp; Vergänglichkeit – Thorsten Poersch</title>
+<meta name="description" content="Aus der Nähe nur Punkte, aus der Ferne ein Gesicht. Thorsten Poersch über sein Werk. Ton an und tippen.">
+<link rel="preload" href="werk.jpg" as="image">
+<link rel="stylesheet" href="../lib/style.css?v=1">
+<style>
+:root{--bg:#121315;--ink:#f3efe8;--scrim:rgba(10,11,13,.6);--subshadow:rgba(0,0,0,.85)}
+.scrim.top{height:18%}.scrim.bot{height:34%}
+.playing .scrim.top{opacity:0}
+.subs{text-shadow:0 1px 3px rgba(0,0,0,.7),0 0 18px rgba(0,0,0,.8)}
+</style>
+</head>
+<body>
+<div class="stage">
+  <img class="still" src="werk.jpg" alt="Schönheit &amp; Vergänglichkeit, Thorsten Poersch">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="scrim top"></div><div class="scrim bot"></div>
+
+  <div class="start loading" role="button" tabindex="0" aria-label="Starten">
+    <p class="eyebrow">Marniok Art Gallery<b>Airport Club Frankfurt</b></p>
+    <div class="foot">
+      <p class="artist">Thorsten Poersch</p>
+      <h1>Schönheit &amp; Vergänglichkeit</h1>
+      <div class="go"><span class="ring"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5v13l11-6.5z" fill="currentColor"/></svg></span>
+        <span>Tippen und zuhören<small>Aus der Nähe nur Punkte · Ton an</small></span></div>
+    </div>
+  </div>
+
+  <p class="subs" aria-live="off"></p>
+  <div class="bar"><i></i></div>
+  <div class="pausehint"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5v13l11-6.5z" fill="currentColor"/></svg></div>
+
+  <div class="end">
+    <p class="t">Schönheit &amp; Vergänglichkeit</p>
+    <p class="m">Thorsten Poersch · Mixed Media auf Leinwand</p>
+    <div class="row">
+      <button type="button" class="again">Nochmal</button>
+      <a class="fill" href="https://marniokart.com/collections/thorsten-poersch" target="_blank" rel="noopener">Zum Künstler</a>
+    </div>
+  </div>
+  <audio id="voice" src="stimme.mp3" preload="auto"></audio>
+</div>
+<script src="../lib/echo.js?v=1"></script>
+<script src="szene.js?v=1"></script>
+</body>
+</html>
