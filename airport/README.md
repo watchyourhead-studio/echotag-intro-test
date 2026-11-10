@@ -3,10 +3,12 @@
 Zwei Intros für die QR-Platten der Marniok Art Gallery. Jede Seite zeigt nach einem Tipp eine
 Kamerafahrt durch das Werk, die der Sprachaufnahme des Künstlers folgt, mit Untertiteln Wort für Wort.
 
-- `poersch/` – Thorsten Poersch, „Schönheit & Vergänglichkeit“: Start ganz nah (nur Punkte), die Kamera
-  fährt zurück, das Gesicht entsteht. Punkte bröckeln, lösen sich auf und blühen neu auf, passend zum Text.
+- `poersch/` – Thorsten Poersch, „Schönheit & Vergänglichkeit“: die Punkte schweben räumlich vor dem Putz und fügen sich nur von
+  einem Standpunkt aus zum Gesicht. Die Kamera fliegt durch die Punktwolke dorthin; Neigen lässt es zerfallen. Punkte bröckeln, lösen sich auf und blühen neu auf, passend zum Text.
 - `kirsch/` – Susanne Kirsch, „Barfuß durch New York“: Start bei der Handschrift „Frankfurt → New York“,
   Flug in die Collage, die Kamera besucht die Stellen, von denen sie spricht.
+- `raum/` – Raumbild für den Schluss (mit Magnific erzeugt) samt Tiefenkarte. Das Werk wird als echtes Foto
+  hineingesetzt; wo es hängt und wie groß, steht in `RAUM` oben in `poersch/szene.js`.
 - `lib/echo.js` – gemeinsamer Ablauf (Start-Tipp, Stimme, Untertitel, Zeitspuren, Neigung, Schlussbild).
 
 ## Bild austauschen
