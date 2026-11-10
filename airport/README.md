@@ -9,6 +9,8 @@ Kamerafahrt durch das Werk, die der Sprachaufnahme des Künstlers folgt, mit Unt
   Flug in die Collage als Relief, die Kamera besucht die Stellen, von denen sie spricht. Schluss im hellen Loft.
 - `raum/` – Raumbild für den Schluss (mit Magnific erzeugt) samt Tiefenkarte. Das Werk wird als echtes Foto
   hineingesetzt; wo es hängt und wie groß, steht in `RAUM` oben in `poersch/szene.js`.
+- `marke/` – watchyourhead als Absender: Logo und der Schriftzug „Hörst du das?“ (aus der Druckdatei der Schilder)
+  und `kontakt.js` mit den Daten für den Knopf „Kontakt speichern“ im Schlussbild.
 - `lib/echo.js` – gemeinsamer Ablauf (Start-Tipp, Stimme, Untertitel, Zeitspuren, Neigung, Schlussbild).
 
 ## Bild austauschen

@@ -51,6 +51,19 @@
     else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     return t;
   }
+  /* Textur, die erst spaeter gebraucht wird (Raum, Schlussfoto): sofort ein grauer Platzhalter, das Bild laedt nach */
+  function lazyTexture(gl, src, mips, after) {
+    var t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([120, 116, 110, 255]));
+    after.then(function () { return loadImage(src); }).then(function (img) {
+      gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      if (mips) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }
+      else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }).catch(function () {});
+    return t;
+  }
   /* Vollbild-Dreieck */
   var QUAD_VS = '#version 300 es\nout vec2 vP;void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));vP=p*2.-1.;gl_Position=vec4(vP,0.,1.);}';
   /* Gemeinsame Kamera: Bildhoehe = 1, Zoom 1 zeigt das ganze Werk mit Rand an der Wand */
@@ -123,8 +136,49 @@
     }
     window.__seek = function (t) { fixedT = t; frame(performance.now()); };
 
+    /* --- Pixelflaeche des Startbildschirms: lebt leicht, loest sich beim Tippen von der Mitte her auf --- */
+    var pix = startEl.querySelector('.pix'), cells = null, pixT0 = 0, pixOpen = 0;
+    function pixSetup() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 2), W = Math.round(stage.clientWidth * dpr), H = Math.round(stage.clientHeight * dpr);
+      if (!pix || (cells && pix.width === W && pix.height === H)) return;
+      pix.width = W; pix.height = H;
+      var c = Math.max(6, Math.round(W / 30)), nx = Math.ceil(W / c), ny = Math.ceil(H / c), seed = 7;
+      function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+      cells = { c: c, nx: nx, ny: ny, a: [] };
+      for (var y = 0; y < ny; y++) for (var x = 0; x < nx; x++) {
+        var dx = (x + .5) / nx - .5, dy = ((y + .5) / ny - .5) * (H / W), d = Math.min(1, Math.hypot(dx, dy) / .75);
+        /* schwarze Pixel wie auf dem Schild, zum Rand hin dichter, die Mitte bleibt frei fuer die Schrift */
+        var edge = Math.abs(dx) * 2;
+        cells.a.push({ d: d * .72 + rnd() * .28, k: rnd() < Math.pow(Math.max(0, edge - .66) / .34, 1.5) * .6, f: rnd() });
+      }
+    }
+    function pixDraw(now) {
+      if (!pix || startEl.classList.contains('gone')) return;
+      pixSetup();
+      var g = pix.getContext('2d'), c = cells.c, nx = cells.nx, a = cells.a, i, q;
+      var open = pixOpen ? Math.min(1, (now - pixOpen) / 1500) : -1, tw = Math.floor((now - pixT0) / 420);
+      g.clearRect(0, 0, pix.width, pix.height);
+      for (i = 0; i < a.length; i++) {
+        q = a[i];
+        var x = (i % nx) * c, y = Math.floor(i / nx) * c;
+        if (open < 0) { g.fillStyle = (q.k && ((q.f * 97 + tw * q.f * 13) % 7) > 1.2) ? '#0D0B0B' : '#C9E31D'; g.fillRect(x, y, c + 1, c + 1); continue; }
+        var k = (open * 1.25 - q.d) / .16;          /* <0 noch da, 0..1 kippt schwarz, >1 weg */
+        if (k < 0) { g.fillStyle = q.k ? '#0D0B0B' : '#C9E31D'; g.fillRect(x, y, c + 1, c + 1); }
+        else if (k < 1) { g.fillStyle = k < .45 ? '#0D0B0B' : '#C9E31D'; var s2 = c * (1 - k * .75); g.fillRect(x + (c - s2) / 2, y + (c - s2) / 2, s2, s2); }
+      }
+      if (open >= 1) startEl.classList.add('gone');
+    }
+
+    var ready = false, wartet = false, bereit;
+    var geladen = new Promise(function (ok) { bereit = ok; });
     function begin() {
       if (phase !== 'idle') return;
+      if (!ready) {
+        /* noch nicht alles da: Ton jetzt durch die Beruehrung freischalten, Start sobald geladen */
+        if (!wartet) { wartet = true; startEl.classList.add('wartet'); askMotion(); var u = audio.play(); if (u && u.then) u.then(function () { if (!ready) audio.pause(); }).catch(function () {}); }
+        return;
+      }
+      if (!startEl.classList.contains('gone')) { startEl.classList.add('open'); pixOpen = performance.now(); }
       phase = 'playing'; askMotion();
       audio.currentTime = 0; aT = 0; aStamp = performance.now();
       var p = audio.play(); if (p && p.catch) p.catch(function () {});
@@ -154,6 +208,16 @@
     audio.addEventListener('ended', function () { if (phase !== 'playing') return; phase = 'ended'; aStamp = performance.now(); });
     audio.addEventListener('loadedmetadata', function () { if (isFinite(audio.duration)) dur = audio.duration; });
     document.addEventListener('visibilitychange', function () { if (document.hidden && phase === 'playing' && !audio.paused) toggle(); });
+    /* Absender: Visitenkarte zum Speichern, wenn Kontaktdaten hinterlegt sind (marke/kontakt.js) */
+    var K = window.WYH, kBtn = $('.wyh-k');
+    if (kBtn && K && K.name) {
+      var v = ['BEGIN:VCARD', 'VERSION:3.0', 'N:' + K.name.split(' ').reverse().join(';'), 'FN:' + K.name];
+      if (K.firma) v.push('ORG:' + K.firma); if (K.rolle) v.push('TITLE:' + K.rolle);
+      if (K.telefon) v.push('TEL;TYPE=CELL:' + K.telefon); if (K.email) v.push('EMAIL:' + K.email); if (K.web) v.push('URL:' + K.web);
+      v.push('END:VCARD');
+      kBtn.href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(v.join('\r\n'));
+      kBtn.setAttribute('download', 'watchyourhead.vcf'); kBtn.hidden = false;
+    }
     var rep = $('.end .again');
     if (rep) rep.addEventListener('click', function () {
       audio.pause(); root.classList.remove('ended', 'paused'); phase = 'idle'; begin();
@@ -179,16 +243,16 @@
       root.classList.toggle('ended', on && t >= fin); root.classList.toggle('playing', on && t < fin);
       if (on) { updateSubs(Math.min(t, dur)); barFill.style.width = Math.min(100, t / fin * 100) + '%'; }
     }
-    function loop(now) { frame(now); if (fixedT == null) requestAnimationFrame(loop); }
+    function loop(now) { frame(now); pixDraw(now); if (fixedT == null) requestAnimationFrame(loop); }
 
     Promise.all([
       fetch(cfg.subs).then(function (r) { return r.json(); }),
-      gl ? cfg.scene(gl, { program: program, texture: texture, loadImage: loadImage, QUAD_VS: QUAD_VS, CAM_GLSL: CAM_GLSL }) : null,
-      document.fonts && document.fonts.ready
+      gl ? cfg.scene(gl, { program: program, texture: texture, lazyTexture: function (g, src, m) { return lazyTexture(g, src, m, geladen); }, loadImage: loadImage, QUAD_VS: QUAD_VS, CAM_GLSL: CAM_GLSL }) : null
     ]).then(function (r) {
-      lines = r[0]; scene = r[1];
-      startEl.classList.remove('loading');
+      lines = r[0]; scene = r[1]; pixT0 = performance.now(); if (!render) pixDraw(pixT0);
+      startEl.classList.remove('loading'); ready = true; bereit();
       window.__ready = true;
+      if (wartet) { audio.pause(); begin(); }
       requestAnimationFrame(loop);
     }).catch(function (e) { console.error(e); startEl.classList.remove('loading'); });
   }

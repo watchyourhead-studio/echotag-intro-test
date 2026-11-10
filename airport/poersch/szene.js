@@ -14,7 +14,7 @@
     mitte: [.500, .480]
   };
   /* Raumbild: wo das Werk haengt (Mitte in Bildanteilen) und wie hoch es im Raumbild ist */
-  var RAUM = { bild: '../raum/loft.jpg', tiefe: '../raum/loft-tiefe.png', x: .44, y: .43, hoehe: .30, wand: .918, blickX: .52, blickY: .50 };
+  var RAUM = { bild: '../raum/loft.jpg', tiefe: '../raum/loft-tiefe.png', x: .44, y: .43, hoehe: .30, wand: .918, blickX: .52, blickY: .50, seite: 1152 / 2064 };
   var TANF = .36;
   function cam(t, ort, zoom) { return [t, [ORT[ort][0], ORT[ort][1], zoom]]; }
 
@@ -150,10 +150,11 @@
         ' o=vec4(c*al,al);}';
       var bg = K.program(gl, K.QUAD_VS, BG), pt = K.program(gl, PVS, PFS), grund, foto, raumT, raumD, ia, ra, n, vao;
       function mix(a, b, k) { return a + (b - a) * k; }
-      return Promise.all([K.loadImage('grund.jpg'), K.loadImage('werk.jpg'), fetch('punkte.json').then(function (r) { return r.json(); }),
-        K.loadImage(RAUM.bild), K.loadImage(RAUM.tiefe)]).then(function (r) {
-        ia = r[0].naturalWidth / r[0].naturalHeight; ra = r[3].naturalWidth / r[3].naturalHeight;
-        grund = K.texture(gl, r[0], true); foto = K.texture(gl, r[1], true); raumT = K.texture(gl, r[3], true); raumD = K.texture(gl, r[4], false);
+      /* fuer den Start reichen Putzgrund und Punkte; Schlussfoto und Raum laden danach */
+      return Promise.all([K.loadImage('grund.jpg'), fetch('punkte.json').then(function (r) { return r.json(); })]).then(function (r) {
+        r[2] = r[1];
+        ia = r[0].naturalWidth / r[0].naturalHeight; ra = RAUM.seite;
+        grund = K.texture(gl, r[0], true); foto = K.lazyTexture(gl, 'werk.jpg', true); raumT = K.lazyTexture(gl, RAUM.bild, true); raumD = K.lazyTexture(gl, RAUM.tiefe, false);
         var P = r[2].p; n = r[2].n;
         var buf = new Float32Array(n * 8), seed = 1234567;
         function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }

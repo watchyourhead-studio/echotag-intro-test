@@ -3,18 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#E9E3D6">
+<meta name="theme-color" content="#C9E31D">
 <title>Barfuß durch New York – Susanne Kirsch</title>
 <meta name="description" content="Susanne Kirsch erzählt, wie ihr persönlichstes New-York-Bild entstanden ist. Ton an und tippen.">
+<link rel="preload" href="../marke/hoerst-du-das.svg" as="image">
 <link rel="preload" href="werk.jpg" as="image">
-<link rel="stylesheet" href="../lib/style.css?v=9">
+<link rel="preload" href="tiefe.jpg" as="image">
+<link rel="stylesheet" href="../lib/style.css?v=11">
 <style>
 :root{--bg:#E9E3D6;--ink:#14161c}
 /* kein Schleier ueber dem Bild: die Untertitel liegen auf einer kleinen Milchglas-Flaeche */
 .scrim.bot{display:none}
 .scrim.top{height:16%;background:linear-gradient(rgba(240,235,224,.7),transparent)}
 .playing .scrim.top,.ended .scrim.top{opacity:0}
-.start .foot{text-shadow:0 0 14px #f3eee2,0 0 30px #f3eee2}
 .subs{left:14px;right:14px;padding:11px 14px 12px;border-radius:16px;background:rgba(246,242,234,.80);
   -webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);text-shadow:none;box-shadow:0 6px 24px rgba(40,30,20,.10)}
 .subs span{opacity:.38}
@@ -27,13 +28,18 @@
   <canvas id="gl" aria-hidden="true"></canvas>
   <div class="scrim top"></div><div class="scrim bot"></div>
 
+  <!-- Start im Look des Schilds: gelbgruene Flaeche aus Pixeln, die sich beim Tippen aufloest -->
   <div class="start loading" role="button" tabindex="0" aria-label="Starten">
-    <p class="eyebrow">Marniok Art Gallery<b>Airport Club Frankfurt</b></p>
-    <div class="foot">
-      <p class="artist">Susanne Kirsch</p>
-      <h1>Barfuß durch New York</h1>
-      <div class="go"><span class="ring"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5v13l11-6.5z" fill="currentColor"/></svg></span>
-        <span>Tippen und zuhören<small>Die Künstlerin erzählt · Ton an</small></span></div>
+    <canvas class="pix" aria-hidden="true"></canvas>
+    <img class="s-logo" src="../marke/watchyourhead.svg" alt="watchyourhead">
+    <div class="s-mid">
+      <img class="s-frage" src="../marke/hoerst-du-das.svg" alt="Hörst du das?">
+      <p class="s-werk">Susanne Kirsch<b>Barfuß durch New York</b></p>
+    </div>
+    <div class="s-bot">
+      <span class="ring"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5v13l11-6.5z" fill="currentColor"/></svg></span>
+      <p class="s-go"><span class="jetzt">Tippen · Ton an</span><span class="lade">Lädt …</span><small>Die Künstlerin spricht</small></p>
+      <p class="s-ort">Marniok Art Gallery · Airport Club Frankfurt</p>
     </div>
   </div>
 
@@ -42,16 +48,25 @@
   <div class="pausehint"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5v13l11-6.5z" fill="currentColor"/></svg></div>
 
   <div class="end">
+   <div class="e-werk">
     <p class="t">Barfuß durch New York</p>
     <p class="m">Susanne Kirsch · Malerei und Collage auf Leinwand</p>
     <div class="row">
       <button type="button" class="again">Nochmal</button>
       <a class="fill" href="https://marniokart.com/collections/susanne-kirsch" target="_blank" rel="noopener">Zur Künstlerin</a>
     </div>
+   </div>
+   <!-- Absender: watchyourhead. Kontaktknopf erscheint, sobald in ../marke/kontakt.js Daten stehen -->
+   <div class="wyh">
+     <img src="../marke/watchyourhead.svg" alt="watchyourhead">
+     <p>Dieses Hörerlebnis ist von watchyourhead<small>Wir bringen Werke, Räume und Marken zum Sprechen.</small></p>
+     <a class="wyh-k" hidden>Kontakt speichern</a>
+   </div>
   </div>
   <audio id="voice" src="ton.mp3" preload="auto"></audio>
 </div>
-<script src="../lib/echo.js?v=9"></script>
-<script src="szene.js?v=9"></script>
+<script src="../marke/kontakt.js?v=11"></script>
+<script src="../lib/echo.js?v=11"></script>
+<script src="szene.js?v=11"></script>
 </body>
 </html>

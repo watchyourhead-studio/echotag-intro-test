@@ -54,8 +54,8 @@ while y < H:
     y += sp * .866; row += 1
 json.dump({'w': W, 'h': H, 'n': len(pts) // 6, 'p': pts}, open(out + 'punkte.json', 'w'), separators=(',', ':'))
 s = 2 if W < 900 else 1  # kleine Fotos doppelt so gross ablegen
-cv2.imwrite(out + 'grund.jpg', cv2.resize(grund, (W * s, H * s), interpolation=cv2.INTER_CUBIC), [cv2.IMWRITE_JPEG_QUALITY, 84])
-cv2.imwrite(out + 'werk.jpg', cv2.resize(im, (W * s, H * s), interpolation=cv2.INTER_CUBIC), [cv2.IMWRITE_JPEG_QUALITY, 86])
+cv2.imwrite(out + 'grund.jpg', cv2.resize(grund, (W * s, H * s), interpolation=cv2.INTER_CUBIC), [cv2.IMWRITE_JPEG_QUALITY, 76])
+cv2.imwrite(out + 'werk.jpg', cv2.resize(im, (W * s, H * s), interpolation=cv2.INTER_CUBIC), [cv2.IMWRITE_JPEG_QUALITY, 80])
 # Kontrollbild: Grund + Punkte neben dem Original
 chk = cv2.resize(grund, (W * s, H * s), interpolation=cv2.INTER_CUBIC)
 for i in range(0, len(pts), 6):

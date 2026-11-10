@@ -1,5 +1,5 @@
 /* Susanne Kirsch, "Barfuss durch New York": Flug in die Collage, raeumlich.
-   Das Foto bleibt unveraendert; eine Tiefenkarte (tiefe.png, aus tools/kirsch_tiefe.py) hebt Papier und
+   Das Foto bleibt unveraendert; eine Tiefenkarte (tiefe.jpg, aus tools/kirsch_tiefe.py) hebt Papier und
    Spruehlinien als echtes Relief vom Leinwandgrund ab. Die Kamera hat einen wirklichen Standpunkt: schaut sie
    schraeg, verdecken die vorderen Schichten die hinteren und werfen Schatten. Sie folgt dem, was die
    Kuenstlerin gerade sagt. Am Ende liegt alles wieder flach, und die Kamera faehrt zurueck in den Raum.
@@ -19,7 +19,7 @@
     taxi:      [.690, .660],
     ganz:      [.500, .545]
   };
-  var RAUM = { bild: '../raum/hell.jpg', tiefe: '../raum/hell-tiefe.png', x: .56, y: .44, hoehe: .29, wand: .90, blickX: .50, blickY: .50 };
+  var RAUM = { bild: '../raum/hell.jpg', tiefe: '../raum/hell-tiefe.png', x: .56, y: .44, hoehe: .29, wand: .90, blickX: .50, blickY: .50, seite: 1152 / 2064 };
   var TANF = .36;
   function cam(t, ort, zoom) { return [t, [ORT[ort][0], ORT[ort][1], zoom]]; }
 
@@ -106,9 +106,10 @@
         ' o=vec4(col,1.);}';
       var prog = K.program(gl, K.QUAD_VS, FS), tex, dep, raumT, raumD, ia, ra;
       function mix(a, b, k) { return a + (b - a) * k; }
-      return Promise.all([K.loadImage('werk.jpg'), K.loadImage('tiefe.png'), K.loadImage(RAUM.bild), K.loadImage(RAUM.tiefe)]).then(function (im) {
-        ia = im[0].naturalWidth / im[0].naturalHeight; ra = im[2].naturalWidth / im[2].naturalHeight;
-        tex = K.texture(gl, im[0], true); dep = K.texture(gl, im[1], false); raumT = K.texture(gl, im[2], true); raumD = K.texture(gl, im[3], false);
+      /* fuer den Start reichen Werkfoto und Tiefenkarte; der Raum laedt danach */
+      return Promise.all([K.loadImage('werk.jpg'), K.loadImage('tiefe.jpg')]).then(function (im) {
+        ia = im[0].naturalWidth / im[0].naturalHeight; ra = RAUM.seite;
+        tex = K.texture(gl, im[0], true); dep = K.texture(gl, im[1], false); raumT = K.lazyTexture(gl, RAUM.bild, true); raumD = K.lazyTexture(gl, RAUM.tiefe, false);
         var rH = 1 / RAUM.hoehe, rW = rH * ra, rx0 = ia / 2 - RAUM.x * rW, ry0 = .5 - RAUM.y * rH;
         return {
           draw: function (f) {
